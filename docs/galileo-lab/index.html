@@ -1011,13 +1011,16 @@ function _showStage(s) {
   const panel = document.getElementById(`stage-${s}`);
   if (panel) panel.classList.add('active');
 
+  // Resize canvases before initialising stage simulations so canvases draw at the correct size.
+  _resizeCanvases();
+
   // Initialise sim for this stage if needed
   if (s === 0) _initHook();
   if (s === 2) _initRamp();
   if (s === 4) _initDrop();
   if (s === 5) _initHistory();
 
-  // Resize canvases
+  // Also ensure canvases are resized after the browser has painted.
   requestAnimationFrame(_resizeCanvases);
 }
 
@@ -1139,7 +1142,10 @@ function rampReset() {
 function rampUpdateL(val) {
   const L = parseFloat(val);
   document.getElementById('rampLVal').textContent = L.toFixed(2) + ' m';
-  if (_ramp) _ramp.setParams({ L });
+  if (_ramp) {
+    _ramp.setParams({ L });
+    _ramp.reset();
+  }
 }
 
 function rampRecord() {
