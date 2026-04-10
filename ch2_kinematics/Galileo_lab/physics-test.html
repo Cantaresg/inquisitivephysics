@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>physics.js — Test Harness</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0c12; color: #eef2ff;
+    font-family: 'DM Mono', monospace, monospace;
+    padding: 32px; font-size: 13px; line-height: 1.7;
+  }
+  h2 { color: #4df0b0; margin: 24px 0 8px; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+  h3 { color: #ffd166; margin: 16px 0 4px; font-size: 12px; }
+  .pass { color: #4df0b0; }
+  .fail { color: #ff6b6b; }
+  .info { color: #a8b4d0; }
+  table { border-collapse: collapse; margin: 8px 0; }
+  th { color: #6b7a99; padding: 3px 16px 3px 0; font-size: 11px; text-align: left; }
+  td { padding: 2px 16px 2px 0; }
+  canvas { border: 1px solid #252d42; border-radius: 8px; margin-top: 12px; display: block; }
+  .section { background: #111520; border: 1px solid #252d42; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<h2 style="margin-top:0">physics.js — Test Harness</h2>
+<p class="info" style="margin-bottom:24px">Open browser console for full output. All tests run on load.</p>
+
+<div class="section">
+  <h2>1 — Ramp Acceleration</h2>
+  <div id="rampTests"></div>
+</div>
+
+<div class="section">
+  <h2>2 — Theoretical ramp time vs RK4 simulation</h2>
+  <p class="info" style="margin-bottom:8px">Both should match to within 0.1% for frictionless ramp.</p>
+  <div id="rk4Tests"></div>
+</div>
+
+<div class="section">
+  <h2>3 — Terminal velocity reference values</h2>
+  <div id="terminalTests"></div>
+</div>
+
+<div class="section">
+  <h2>4 — RK4 live simulation: position vs time (frictionless ramp, L=2m, θ=30°)</h2>
+  <canvas id="simCanvas" width="700" height="220"></canvas>
+</div>
+
+<div class="section">
+  <h2>5 — Drop simulation: iron ball vs feather (air ON)</h2>
+  <canvas id="dropCanvas" width="700" height="220"></canvas>
+</div>
+
+<script src="src/physics.js"></script>
+<script>
+
+// ── HELPER ──────────────────────────────────────────────────────────────────
+function assert(label, condition, expected, got) {
+  return `<tr>
+    <td class="${condition ? 'pass' : 'fail'}">${condition ? '✓' : '✗'}</td>
+    <td>${label}</td>
+    <td class="info">${expected}</td>
+    <td class="${condition ? 'pass' : 'fail'}">${got}</td>
+  </tr>`;
+}
+
+function tableWrap(rows) {
+  return `<table><tr><th></th><th>Test</th><th>Expected</th><th>Got</th></tr>${rows}</table>`;
+}
+
+// ── TEST 1: RAMP ACCELERATION ───────────────────────────────────────────────
+{
+  const rows = [];
+  const cases = [
+    { angle: 30,  expected: 9.81 * Math.sin(30*Math.PI/180) },
+    { angle: 45,  expected: 9.81 * Math.sin(45*Math.PI/180) },
+    { angle: 10,  expected: 9.81 * Math.sin(10*Math.PI/180) },
+    { angle: 60,  expected: 9.81 * Math.sin(60*Math.PI/180) },
+  ];
+  cases.forEach(({angle, expected}) => {
+    const got = Physics.rampAccel(angle, false);
+    const ok  = Math.abs(got - expected) < 0.0001;
+    rows.push(assert(
+      `θ=${angle}°, airOff`,
+      ok,
+      expected.toFixed(4) + ' m/s²',
+      got.toFixed(4) + ' m/s²'
+    ));
+  });
+  // Friction test: with mu=0.1, angle=30°
+  const muTest = Physics.rampAccel(30, true, 0.1);
+  const muExp  = 9.81*Math.sin(30*Math.PI/180) - 0.1*9.81*Math.cos(30*Math.PI/180);
+  rows.push(assert(
+    'θ=30°, airOn, μ=0.1',
+    Math.abs(muTest - muExp) < 0.0001,
+    muExp.toFixed(4) + ' m/s²',
+    muTest.toFixed(4) + ' m/s²'
+  ));
+  document.getElementById('rampTests').innerHTML = tableWrap(rows.join(''));
+}
+
+// ── TEST 2: THEORETICAL TIME vs RK4 ────────────────────────────────────────
+{
+  const rows = [];
+  const cases = [
+    { L: 1.0, angle: 30 },
+    { L: 2.0, angle: 30 },
+    { L: 1.0, angle: 45 },
+    { L: 0.5, angle: 20 },
+  ];
+  cases.forEach(({L, angle}) => {
+    const tTheory = Physics.rampTime(L, angle);
+    // Simulate with RK4
+    const a = Physics.rampAccel(angle, false);
+    let state = { s: 0, v: 0 };
+    const dt = 0.001;
+    let t = 0;
+    while (state.s < L && t < 30) {
+      state = Physics.rk4(state, dt, () => a);
+      t += dt;
+    }
+    const pct = Math.abs(t - tTheory) / tTheory * 100;
+    rows.push(assert(
+      `L=${L}m, θ=${angle}°`,
+      pct < 0.1,
+      tTheory.toFixed(4) + ' s',
+      `${t.toFixed(4)} s (${pct.toFixed(3)}% error)`
+    ));
+  });
+  document.getElementById('rk4Tests').innerHTML = tableWrap(rows.join(''));
+}
+
+// ── TEST 3: TERMINAL VELOCITY ───────────────────────────────────────────────
+{
+  const rows = [];
+  Object.entries(Physics.OBJECTS).forEach(([key, obj]) => {
+    const vt = Physics.terminalVelocity(obj);
+    rows.push(`<tr><td>${obj.label}</td><td class="pass">${vt.toFixed(2)} m/s</td></tr>`);
+  });
+  document.getElementById('terminalTests').innerHTML =
+    `<table><tr><th>Object</th><th>Terminal velocity</th></tr>${rows.join('')}</table>`;
+}
+
+// ── TEST 4: LIVE RK4 CANVAS ─────────────────────────────────────────────────
+{
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const L = 2.0, angle = 30;
+  const a  = Physics.rampAccel(angle, false);
+  const dt = 0.016;
+
+  // Pre-compute trajectory
+  const pts = [];
+  let state = { s: 0, v: 0 }, t = 0;
+  while (state.s < L) {
+    pts.push({ t, s: state.s, v: state.v });
+    state = Physics.rk4(state, dt, () => a);
+    t += dt;
+  }
+  pts.push({ t, s: L, v: state.v });
+
+  const maxT = pts[pts.length-1].t;
+  const pad = { l: 52, r: 20, t: 20, b: 36 };
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+
+  ctx.fillStyle = '#0a0c12'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = '#252d42'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+ph); ctx.lineTo(pad.l+pw,pad.t+ph); ctx.stroke();
+
+  // Position curve (green)
+  ctx.beginPath(); ctx.strokeStyle = '#4df0b0'; ctx.lineWidth = 2;
+  pts.forEach((p,i) => {
+    const x = pad.l + (p.t/maxT)*pw;
+    const y = pad.t + ph - (p.s/L)*ph;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Velocity curve (gold) — normalise to L
+  const maxV = pts[pts.length-1].v;
+  ctx.beginPath(); ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+  pts.forEach((p,i) => {
+    const x = pad.l + (p.t/maxT)*pw;
+    const y = pad.t + ph - (p.v/maxV)*ph;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = '#4df0b0'; ctx.font = '11px monospace';
+  ctx.fillText('position (s)', pad.l+8, pad.t+14);
+  ctx.fillStyle = '#ffd166';
+  ctx.fillText('velocity (v)', pad.l+8, pad.t+28);
+  ctx.fillStyle = '#6b7a99';
+  ctx.fillText('time →', pad.l+pw-40, pad.t+ph+20);
+  ctx.fillText(`L=${L}m θ=${angle}° t_theory=${Physics.rampTime(L,angle).toFixed(3)}s`, pad.l, pad.t+ph+20);
+}
+
+// ── TEST 5: DROP SIMULATION ─────────────────────────────────────────────────
+{
+  const canvas = document.getElementById('dropCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const DROP = 20; // metres — tall virtual column
+  const dt = 0.016;
+
+  const objects = [
+    { obj: Physics.OBJECTS.ironBall,  label: 'Iron Ball',  color: '#c77dff' },
+    { obj: Physics.OBJECTS.feather,   label: 'Feather',    color: '#ffd166' },
+  ];
+
+  const traces = objects.map(({obj, color, label}) => {
+    const accelFn = Physics.dropAccel(obj, true);
+    let state = { s: 0, v: 0 };
+    const pts = [];
+    let t = 0;
+    while (state.s < DROP && t < 10) {
+      pts.push({ t, s: state.s, v: state.v });
+      state = Physics.rk4(state, dt, accelFn);
+      t += dt;
+    }
+    return { pts, color, label, vt: Physics.terminalVelocity(obj) };
+  });
+
+  const maxT = Math.max(...traces.map(tr => tr.pts[tr.pts.length-1].t));
+  const pad = { l: 52, r: 20, t: 20, b: 36 };
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+
+  ctx.fillStyle = '#0a0c12'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = '#252d42'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+ph); ctx.lineTo(pad.l+pw,pad.t+ph); ctx.stroke();
+
+  traces.forEach(({pts, color, label, vt}, ti) => {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
+    pts.forEach((p,i) => {
+      const x = pad.l + (p.t/maxT)*pw;
+      const y = pad.t + ph - (p.s/DROP)*ph;
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    ctx.fillStyle = color; ctx.font = '11px monospace';
+    ctx.fillText(`${label}  v_t=${vt.toFixed(1)}m/s`, pad.l+8, pad.t+14+ti*16);
+  });
+
+  ctx.fillStyle = '#6b7a99'; ctx.font = '11px monospace';
+  ctx.fillText('time →', pad.l+pw-40, pad.t+ph+20);
+  ctx.fillText('Drop height: 20m, air ON', pad.l, pad.t+ph+20);
+}
+
+</script>
+</body>
+</html>

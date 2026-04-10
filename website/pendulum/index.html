@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pendulum Lab — PhysicsSims</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0a0c12;
+  --surface: #111520;
+  --surface2: #161b28;
+  --border: #252d42;
+  --border2: #2e3850;
+  --accent: #4df0b0;
+  --accent-dim: rgba(77,240,176,0.12);
+  --gold: #ffd166;
+  --gold-dim: rgba(255,209,102,0.12);
+  --purple: #c77dff;
+  --red: #ff6b6b;
+  --text: #eef2ff;
+  --text-mid: #a8b4d0;
+  --text-dim: #6b7a99;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+header {
+  display: flex; align-items: center;
+  padding: 0 24px; height: 52px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  gap: 16px; flex-shrink: 0;
+}
+.logo { font-size: 1rem; font-weight: 700; color: var(--accent); }
+.logo em { color: var(--text); font-style: normal; }
+.page-title { font-size: 0.82rem; color: var(--text-mid); font-weight: 500; }
+.mode-pill {
+  margin-left: auto;
+  font-family: 'DM Mono', monospace; font-size: 0.68rem;
+  padding: 3px 11px; border-radius: 20px;
+  border: 1px solid var(--accent); color: var(--accent);
+  background: var(--accent-dim); letter-spacing: 0.05em;
+  transition: all 0.2s;
+}
+.mode-pill.lab { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+
+/* LAYOUT */
+.app { display: flex; flex: 1; min-height: 0; }
+
+/* SIM COLUMN */
+.sim-col {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  padding: 16px 20px; gap: 12px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.btn {
+  font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600;
+  padding: 7px 14px; border-radius: 7px;
+  border: 1.5px solid var(--border2); background: var(--surface2);
+  color: var(--text); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.btn.active { background: var(--accent); color: #050a0a; border-color: var(--accent); font-weight: 700; }
+.btn.go { background: var(--accent); color: #050a0a; border-color: var(--accent); font-weight: 700; }
+.btn.go:hover { background: #38d49a; }
+.btn.danger:hover { border-color: var(--red); color: var(--red); background: rgba(255,107,107,0.1); }
+.btn.gold-style:hover { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+.btn.purple-style:hover { border-color: var(--purple); color: var(--purple); background: rgba(199,125,255,0.1); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+.divider { width: 1px; height: 26px; background: var(--border2); margin: 0 2px; flex-shrink: 0; }
+
+/* CANVAS */
+.canvas-frame {
+  position: relative; border-radius: 12px;
+  border: 1px solid var(--border2); background: var(--surface);
+  overflow: hidden; box-shadow: 0 4px 40px rgba(0,0,0,0.5);
+  flex-shrink: 0;
+}
+.canvas-frame::after {
+  content: ''; position: absolute; inset: 0; border-radius: 12px;
+  pointer-events: none; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+#simCanvas { display: block; width: 100%; cursor: grab; }
+#simCanvas:active { cursor: grabbing; }
+
+/* STOPWATCH — compact single row */
+.watch-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 10px 16px; flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* The stopwatch face */
+.sw-face {
+  display: flex; align-items: baseline; gap: 2px;
+  font-family: 'DM Mono', monospace; font-weight: 500;
+  line-height: 1;
+}
+.sw-seg { font-size: 1.5rem; color: var(--accent); letter-spacing: 0.02em; }
+.sw-sep { font-size: 1.3rem; color: var(--text-dim); margin: 0 1px; }
+.sw-cs  { font-size: 1.1rem; color: var(--accent); opacity: 0.85; }
+.sw-unit { font-size: 0.62rem; color: var(--text-dim); align-self: flex-end; margin-left: 1px; margin-bottom: 3px; letter-spacing: 0.05em; }
+
+.sw-btns { display: flex; gap: 7px; }
+
+.sw-divider { width: 1px; height: 32px; background: var(--border2); margin: 0 4px; }
+
+/* Oscillation counter */
+.osc-block { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.osc-inner { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.osc-lbl { font-size: 0.6rem; color: var(--text-dim); font-family: 'DM Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+.osc-num {
+  font-family: 'DM Mono', monospace; font-size: 1.4rem; font-weight: 500;
+  color: var(--gold); min-width: 38px; text-align: center; line-height: 1;
+  transition: filter 0.2s;
+}
+.osc-num.hidden { filter: blur(7px); user-select: none; }
+
+/* DATA BAR */
+.data-bar {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 9px; flex-shrink: 0;
+}
+.di { display: flex; flex-direction: column; gap: 2px; }
+.di-lbl { font-size: 0.62rem; color: var(--text-dim); font-family: 'DM Mono', monospace; letter-spacing: 0.07em; text-transform: uppercase; }
+.di-val { font-size: 0.88rem; font-family: 'DM Mono', monospace; font-weight: 500; color: var(--text); }
+.di-val.c-accent { color: var(--accent); }
+.di-val.c-gold   { color: var(--gold); }
+.di-val.c-purple { color: var(--purple); }
+
+/* GRAPH */
+#graphCanvas {
+  width: 100%; border-radius: 10px;
+  border: 1px solid var(--border2); display: none; flex-shrink: 0;
+}
+
+/* SIDE PANEL */
+.side-panel {
+  width: 292px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  overflow-y: auto; background: var(--surface);
+}
+.ps { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); }
+.ps:last-child { border-bottom: none; }
+.ps-title {
+  font-size: 0.62rem; font-family: 'DM Mono', monospace;
+  color: var(--text-dim); letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 12px; font-weight: 500;
+}
+
+/* Setup cards */
+.setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.sc {
+  padding: 10px 8px; border: 1.5px solid var(--border2); border-radius: 9px;
+  background: var(--bg); cursor: pointer; transition: all 0.15s;
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.sc:hover { border-color: var(--accent); background: var(--accent-dim); }
+.sc.active { border-color: var(--accent); background: var(--accent-dim); }
+.sc-icon { font-size: 1.35rem; }
+.sc-name { font-size: 0.7rem; font-weight: 600; color: var(--text); }
+.sc-desc { font-size: 0.6rem; color: var(--text-dim); line-height: 1.3; }
+.sc.active .sc-name { color: var(--accent); }
+
+/* Sliders */
+.sr { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.sr-lbl { font-size: 0.78rem; color: var(--text-mid); font-weight: 500; min-width: 82px; }
+.sr-val { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--accent); min-width: 52px; text-align: right; font-weight: 500; }
+input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; }
+
+/* Table */
+.table-wrap { max-height: 170px; overflow-y: auto; border-radius: 7px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+th {
+  font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--text-dim);
+  text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--border);
+  background: var(--surface2); position: sticky; top: 0; letter-spacing: 0.05em;
+}
+td {
+  font-family: 'DM Mono', monospace; font-size: 0.7rem;
+  padding: 5px 7px; border-bottom: 1px solid rgba(255,255,255,0.03); color: var(--text-mid);
+}
+tbody tr:last-child td { color: var(--accent); }
+tbody tr:hover td { background: var(--surface2); }
+.empty-st { padding: 14px; text-align: center; color: var(--text-dim); font-size: 0.76rem; line-height: 1.6; }
+
+/* AI */
+.api-row { display: flex; gap: 7px; margin-bottom: 9px; }
+.api-input {
+  flex: 1; background: var(--bg); border: 1.5px solid var(--border2); border-radius: 7px;
+  padding: 6px 10px; font-family: 'DM Mono', monospace; font-size: 0.7rem;
+  color: var(--text); outline: none; transition: border-color 0.15s;
+}
+.api-input:focus { border-color: var(--accent); }
+.api-input::placeholder { color: var(--text-dim); }
+.ai-box {
+  background: var(--bg); border: 1.5px solid var(--border2); border-radius: 9px;
+  padding: 12px; font-size: 0.78rem; line-height: 1.65; color: var(--text-mid);
+  min-height: 70px; margin-bottom: 9px;
+}
+.ai-box.lit { border-color: rgba(77,240,176,0.3); }
+.ai-tag { display: block; font-family: 'DM Mono', monospace; font-size: 0.58rem; color: var(--accent); letter-spacing: 0.1em; margin-bottom: 7px; text-transform: uppercase; }
+.ai-qs { display: flex; flex-direction: column; gap: 5px; }
+.ai-q {
+  background: var(--bg); border: 1.5px solid var(--border); border-radius: 7px;
+  padding: 7px 10px; font-size: 0.73rem; color: var(--text-mid);
+  cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s; line-height: 1.4;
+}
+.ai-q:hover { border-color: var(--accent); color: var(--text); background: var(--accent-dim); }
+
+@media (max-width: 860px) {
+  .app { flex-direction: column; }
+  .side-panel { width: 100%; border-top: 1px solid var(--border); }
+  .sim-col { border-right: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Physics<em>Sims</em></div>
+  <div class="page-title">Pendulum Lab · O-Level</div>
+  <div class="mode-pill" id="modePill">IDEAL MODE</div>
+</header>
+
+<div class="app">
+  <!-- SIM COLUMN -->
+  <div class="sim-col">
+
+    <div class="toolbar">
+      <button class="btn active" id="btnIdeal" onclick="setMode('ideal')">Ideal</button>
+      <button class="btn"        id="btnLab"   onclick="setMode('lab')">Lab Mode</button>
+      <div class="divider"></div>
+      <button class="btn go" id="btnRelease" onclick="toggleRelease()">▶ Release</button>
+      <button class="btn danger" onclick="resetSim()">↺ Reset</button>
+      <div class="divider"></div>
+      <button class="btn purple-style" id="btnRecord" onclick="recordMeasurement()" disabled>⊕ Record</button>
+      <button class="btn gold-style" onclick="downloadCSV()">↓ CSV</button>
+      <button class="btn gold-style" id="btnGraph" onclick="showGraph()">Show Graph</button>
+    </div>
+
+    <!-- Canvas — taller -->
+    <div class="canvas-frame">
+      <canvas id="simCanvas" width="760" height="500"></canvas>
+    </div>
+
+    <!-- Stopwatch row — compact -->
+    <div class="watch-row">
+      <!-- Clock face -->
+      <div class="sw-face">
+        <span class="sw-seg" id="swH">00</span><span class="sw-unit">h</span>
+        <span class="sw-sep"> </span>
+        <span class="sw-seg" id="swM">00</span><span class="sw-unit">m</span>
+        <span class="sw-sep"> </span>
+        <span class="sw-seg" id="swS">00</span><span class="sw-sep">.</span><span class="sw-cs" id="swCS">00</span><span class="sw-unit">s</span>
+      </div>
+
+      <div class="sw-divider"></div>
+
+      <div class="sw-btns">
+        <button class="btn" id="btnSW" onclick="toggleStopwatch()">Start</button>
+        <button class="btn danger" onclick="resetStopwatch()">Reset</button>
+      </div>
+
+      <div class="sw-divider"></div>
+
+      <!-- Oscillation counter -->
+      <div class="osc-block">
+        <div class="osc-inner">
+          <span class="osc-lbl">Oscillations</span>
+          <span class="osc-num hidden" id="oscNum">0</span>
+        </div>
+        <button class="btn" id="btnReveal" onclick="toggleReveal()" style="padding:5px 11px; font-size:0.74rem;">Reveal</button>
+      </div>
+    </div>
+
+    <!-- Data bar -->
+    <div class="data-bar">
+      <div class="di"><span class="di-lbl">Length L</span><span class="di-val c-accent" id="infoL">0.50 m</span></div>
+      <div class="di"><span class="di-lbl">T measured</span><span class="di-val c-accent" id="infoT">—</span></div>
+      <div class="di"><span class="di-lbl">T exact (RK4)</span><span class="di-val c-gold" id="infoTExact">—</span></div>
+      <div class="di"><span class="di-lbl">T approx (SHM)</span><span class="di-val c-purple" id="infoTApprox">—</span></div>
+    </div>
+
+    <canvas id="graphCanvas" width="760" height="300"></canvas>
+
+  </div>
+
+  <!-- SIDE PANEL -->
+  <div class="side-panel">
+
+    <div class="ps">
+      <div class="ps-title">Pendulum Setup</div>
+      <div class="setup-grid">
+        <div class="sc active" id="setup_simple"    onclick="setSetup('simple')">
+          <div class="sc-icon">⚫</div><div class="sc-name">Simple Bob</div><div class="sc-desc">Standard setup</div>
+        </div>
+        <div class="sc" id="setup_paperclip" onclick="setSetup('paperclip')">
+          <div class="sc-icon">📎</div><div class="sc-name">Paperclip</div><div class="sc-desc">Lighter mass</div>
+        </div>
+        <div class="sc" id="setup_rod"       onclick="setSetup('rod')">
+          <div class="sc-icon">📏</div><div class="sc-name">Pivot Rod</div><div class="sc-desc">Effective L changes</div>
+        </div>
+        <div class="sc" id="setup_heavy"     onclick="setSetup('heavy')">
+          <div class="sc-icon">🔩</div><div class="sc-name">Heavy Bob</div><div class="sc-desc">Compare mass effect</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Parameters</div>
+      <div class="sr">
+        <span class="sr-lbl" id="lblLLabel">Length (L)</span>
+        <input type="range" id="sliderL" min="0.10" max="1.50" step="0.01" value="0.50" oninput="updateParams()">
+        <span class="sr-val" id="lblL">0.50 m</span>
+      </div>
+      <div class="sr">
+        <span class="sr-lbl">Release angle</span>
+        <input type="range" id="sliderAngle" min="2" max="85" step="1" value="15" oninput="updateParams()">
+        <span class="sr-val" id="lblAngle" style="visibility:hidden">15°</span>
+      </div>
+      <div class="sr" id="tempRow" style="display:none">
+        <span class="sr-lbl">Temperature</span>
+        <input type="range" id="sliderTemp" min="0" max="50" step="1" value="25" oninput="updateParams()">
+        <span class="sr-val" id="lblTemp">25 °C</span>
+      </div>
+      <div class="sr" id="rodRow" style="display:none">
+        <span class="sr-lbl">Rod position</span>
+        <input type="range" id="sliderRod" min="0.05" max="0.70" step="0.01" value="0.25" oninput="updateParams()">
+        <span class="sr-val" id="lblRod">0.25 m</span>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Lab Data</div>
+      <div class="table-wrap">
+        <div class="empty-st" id="emptyState">No data yet.<br>Release, time oscillations,<br>then ⊕ Record.</div>
+        <table id="dataTable" style="display:none">
+          <thead><tr><th>#</th><th>L (m)</th><th>n</th><th>t (s)</th><th>T (s)</th><th>T² (s²)</th></tr></thead>
+          <tbody id="dataBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:9px">
+        <button class="btn danger" onclick="clearData()" style="font-size:0.73rem; padding:5px 11px;">Clear Data</button>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">AI Explainer</div>
+      <div class="api-row">
+        <input class="api-input" type="password" id="apiKey" placeholder="Anthropic API key (optional)">
+        <button class="btn" onclick="saveKey()" style="padding:6px 11px; font-size:0.76rem">Save</button>
+      </div>
+      <div class="ai-box" id="aiBox">
+        <span class="ai-tag">▸ Physics Guide</span>
+        Drag the bob to set position, then click <strong>Release</strong>. Start the timer when you're ready to count oscillations, stop it after several swings, then click <strong>⊕ Record</strong>.
+        <br><br><span style="color:var(--text-dim);font-size:0.73rem">Add an API key above for interactive explanations.</span>
+      </div>
+      <div class="ai-qs">
+        <button class="ai-q" onclick="askAI('large_angle')">Why does a large angle change the period?</button>
+        <button class="ai-q" onclick="askAI('rod')">Why does hitting the rod change T?</button>
+        <button class="ai-q" onclick="askAI('exact_vs_shm')">What's the difference between exact and SHM?</button>
+        <button class="ai-q" onclick="askAI('lab_mode')">Why does Lab Mode slow the pendulum?</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const g = 9.81;
+const W = 760, H = 500;
+const PIVOT_X = W/2, PIVOT_Y = 90;
+const SCALE = 370; // px per metre
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let S = {
+  mode:'ideal', setup:'simple',
+  running:false, released:false, dragging:false,
+  L:0.50, releaseAngle:15*Math.PI/180,
+  theta:15*Math.PI/180, omega:0, simT:0,
+  temp:25, rodPos:0.25,
+  // stopwatch
+  swRunning:false, swTime:0,
+  // oscillation counting — only active while stopwatch runs
+  oscCount:0, lastSign:0, countingOsc:false,
+};
+let dataRows = [];
+let apiKey = '';
+let lastTs = null;
+let oscRevealed = false;
+
+// ── PHYSICS ────────────────────────────────────────────────────────────────
+function rk4(th,om,dt,L,b){
+  const f=(t,o)=>[o,-(g/L)*Math.sin(t)-b*o];
+  const[k1t,k1o]=f(th,om);
+  const[k2t,k2o]=f(th+.5*dt*k1t,om+.5*dt*k1o);
+  const[k3t,k3o]=f(th+.5*dt*k2t,om+.5*dt*k2o);
+  const[k4t,k4o]=f(th+dt*k3t,om+dt*k3o);
+  return[th+dt/6*(k1t+2*k2t+2*k3t+k4t), om+dt/6*(k1o+2*k2o+2*k3o+k4o)];
+}
+function damping(){ if(S.mode==='ideal')return 0; const r=1.293*273.15/(273.15+S.temp); return 0.016*r/1.293; }
+function effL(){
+  if(S.setup==='paperclip') return S.L*2/3;
+  if(S.setup==='rod'&&S.theta<-0.01) return Math.max(S.L-S.rodPos,0.05);
+  return S.L;
+}
+function exactPeriod(Leff,a0){ const k=Math.sin(a0/2); return 2*Math.PI*Math.sqrt(Leff/g)*(1+k*k/4+9*k*k*k*k/64); }
+function shmPeriod(Leff){ return 2*Math.PI*Math.sqrt(Leff/g); }
+
+// ── LOOP ───────────────────────────────────────────────────────────────────
+function loop(ts){
+  if(!lastTs) lastTs=ts;
+  const wdt=Math.min((ts-lastTs)/1000, 0.033);
+  lastTs=ts;
+
+  if(S.running){
+    const steps=20, dt=wdt/steps;
+    for(let i=0;i<steps;i++){
+      [S.theta,S.omega]=rk4(S.theta,S.omega,dt,effL(),damping());
+      S.simT+=dt;
+    }
+    // Count oscillations ONLY while stopwatch is running
+    if(S.countingOsc){
+      const sign=Math.sign(S.theta);
+      if(sign!==0 && sign!==S.lastSign && S.lastSign!==0){
+        if(sign<0) { // one full oscillation completed
+          S.oscCount++;
+          document.getElementById('oscNum').textContent=S.oscCount;
+        }
+      }
+      S.lastSign=sign;
+    }
+  }
+
+  if(S.swRunning){
+    S.swTime+=wdt;
+    renderStopwatch(S.swTime);
+  }
+
+  draw();
+  updateInfoBar();
+  requestAnimationFrame(loop);
+}
+
+// ── STOPWATCH DISPLAY ──────────────────────────────────────────────────────
+function renderStopwatch(t){
+  const totalS = Math.floor(t);
+  const cs     = Math.floor((t - totalS)*100);
+  const h      = Math.floor(totalS/3600);
+  const m      = Math.floor((totalS%3600)/60);
+  const s      = totalS%60;
+  document.getElementById('swH').textContent  = String(h).padStart(2,'0');
+  document.getElementById('swM').textContent  = String(m).padStart(2,'0');
+  document.getElementById('swS').textContent  = String(s).padStart(2,'0');
+  document.getElementById('swCS').textContent = String(cs).padStart(2,'0');
+}
+
+// ── DRAW ───────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('simCanvas');
+const ctx    = canvas.getContext('2d');
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // Subtle grid
+  ctx.strokeStyle='rgba(255,255,255,0.022)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  const Lpx=S.L*SCALE;
+  const bobX=PIVOT_X+Math.sin(S.theta)*Lpx;
+  const bobY=PIVOT_Y+Math.cos(S.theta)*Lpx;
+
+  // Ceiling mount
+  const mw=90, mh=13;
+  ctx.fillStyle='#1a2035';
+  ctx.beginPath(); ctx.roundRect(PIVOT_X-mw/2, PIVOT_Y-mh-5, mw, mh, 4); ctx.fill();
+  ctx.strokeStyle='#28324e'; ctx.lineWidth=1; ctx.stroke();
+  // hatch
+  ctx.strokeStyle='#1f2940'; ctx.lineWidth=1;
+  for(let i=0;i<7;i++){
+    ctx.beginPath();
+    ctx.moveTo(PIVOT_X-mw/2+i*14, PIVOT_Y-mh-5);
+    ctx.lineTo(PIVOT_X-mw/2+i*14-10, PIVOT_Y-5);
+    ctx.stroke();
+  }
+
+  // Pivot rod setup
+  if(S.setup==='rod'){
+    const ry=PIVOT_Y+S.rodPos*SCALE;
+    ctx.save();
+    ctx.strokeStyle='#ffd16670'; ctx.lineWidth=4; ctx.lineCap='round';
+    ctx.shadowColor='#ffd16633'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.moveTo(PIVOT_X-5,ry); ctx.lineTo(PIVOT_X+5,ry); ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.lineWidth=2; ctx.strokeStyle='#ffd16640';
+    ctx.beginPath(); ctx.moveTo(PIVOT_X,ry); ctx.lineTo(PIVOT_X+50,ry); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle='#ffd16675'; ctx.font='11px DM Mono, monospace';
+    ctx.fillText('rod',PIVOT_X+54,ry+4);
+  }
+
+  // Vertical ref
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  ctx.setLineDash([5,8]);
+  ctx.beginPath(); ctx.moveTo(PIVOT_X,PIVOT_Y); ctx.lineTo(PIVOT_X,PIVOT_Y+Lpx+36); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // String / paperclip chain
+  ctx.save();
+  if(S.setup==='paperclip'){
+    // Draw a chain of linked paperclips along the string
+    const dx=bobX-PIVOT_X, dy=bobY-PIVOT_Y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/dist, uy=dy/dist; // unit vector along string
+    const px=-uy, py=ux;          // perpendicular unit vector
+    const clipH=18, clipW=6, gap=2;
+    const step=clipH+gap;
+    const count=Math.max(1,Math.floor(dist/step));
+    ctx.strokeStyle='#9aabb8'; ctx.lineWidth=1.4;
+    ctx.shadowColor='rgba(154,171,184,0.25)'; ctx.shadowBlur=4;
+    for(let i=0;i<count;i++){
+      const t0=(i*step)/dist, t1=Math.min((i*step+clipH)/dist,1);
+      const cx0=PIVOT_X+dx*t0, cy0=PIVOT_Y+dy*t0;
+      const cx1=PIVOT_X+dx*t1, cy1=PIVOT_Y+dy*t1;
+      const mid0x=(cx0+cx1)/2, mid0y=(cy0+cy1)/2;
+      // Alternate clip orientation each link for realism
+      const side=(i%2===0)?1:-1;
+      const ox=px*clipW*side, oy=py*clipW*side;
+      // Outer loop of paperclip
+      ctx.beginPath();
+      ctx.moveTo(cx0,cy0);
+      ctx.bezierCurveTo(cx0+ox,cy0+oy, cx1+ox,cy1+oy, cx1,cy1);
+      ctx.stroke();
+      // Inner return loop
+      ctx.beginPath();
+      ctx.moveTo(cx0,cy0);
+      ctx.bezierCurveTo(cx0+ox*.4,cy0+oy*.4, mid0x+ox*.4,mid0y+oy*.4, mid0x,mid0y);
+      ctx.stroke();
+    }
+    ctx.shadowBlur=0;
+  } else {
+    ctx.strokeStyle='#d4b896';
+    ctx.lineWidth=2.5;
+    ctx.shadowColor='rgba(212,184,150,0.18)'; ctx.shadowBlur=5;
+    if(S.setup==='rod'&&S.theta<-0.01){
+      const ry=PIVOT_Y+S.rodPos*SCALE;
+      ctx.beginPath(); ctx.moveTo(PIVOT_X,PIVOT_Y); ctx.lineTo(PIVOT_X,ry); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(PIVOT_X,ry); ctx.lineTo(bobX,bobY); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(PIVOT_X,PIVOT_Y); ctx.lineTo(bobX,bobY); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Pivot pin
+  ctx.beginPath(); ctx.arc(PIVOT_X,PIVOT_Y,5,0,Math.PI*2);
+  ctx.fillStyle='#4df0b0'; ctx.shadowColor='#4df0b055'; ctx.shadowBlur=12; ctx.fill(); ctx.shadowBlur=0;
+
+  // Equilibrium dot (other setups only)
+  if(S.setup!=='paperclip'){
+    ctx.beginPath(); ctx.arc(PIVOT_X,PIVOT_Y+Lpx,3,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.1)'; ctx.fill();
+  }
+
+  if(S.setup==='paperclip'){
+    // No bob — chain has distributed mass
+    // Mark centre of mass at midpoint of chain (L/2 along the chain)
+    const cmX=PIVOT_X+Math.sin(S.theta)*Lpx*0.5;
+    const cmY=PIVOT_Y+Math.cos(S.theta)*Lpx*0.5;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cmX,cmY,4,0,Math.PI*2);
+    ctx.fillStyle='rgba(77,240,176,0.35)';
+    ctx.shadowColor='#4df0b055'; ctx.shadowBlur=8; ctx.fill();
+    ctx.strokeStyle='#4df0b088'; ctx.lineWidth=1; ctx.stroke();
+    ctx.shadowBlur=0; ctx.restore();
+  } else {
+    // Bob
+    let br=20, bc='#4df0b0', bs='#28a876';
+    if(S.setup==='heavy'){br=30; bc='#c77dff'; bs='#8850cc';}
+
+    // Glow halo
+    const halo=ctx.createRadialGradient(bobX,bobY,0,bobX,bobY,br*2.2);
+    halo.addColorStop(0,bc+'40'); halo.addColorStop(1,bc+'00');
+    ctx.beginPath(); ctx.arc(bobX,bobY,br*2.2,0,Math.PI*2);
+    ctx.fillStyle=halo; ctx.fill();
+
+    // Bob sphere
+    const sph=ctx.createRadialGradient(bobX-br*.28,bobY-br*.28,0,bobX,bobY,br);
+    sph.addColorStop(0,bc); sph.addColorStop(0.55,bc+'cc'); sph.addColorStop(1,bs);
+    ctx.beginPath(); ctx.arc(bobX,bobY,br,0,Math.PI*2);
+    ctx.fillStyle=sph; ctx.shadowColor=bc+'44'; ctx.shadowBlur=18; ctx.fill();
+    ctx.strokeStyle=bs; ctx.lineWidth=1.5; ctx.stroke(); ctx.shadowBlur=0;
+
+    // Heavy bolt detail
+    if(S.setup==='heavy'){
+      ctx.strokeStyle='#7040aa'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(bobX-9,bobY); ctx.lineTo(bobX+9,bobY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bobX,bobY-9); ctx.lineTo(bobX,bobY+9); ctx.stroke();
+      ctx.beginPath(); ctx.arc(bobX,bobY,4,0,Math.PI*2);
+      ctx.fillStyle='#c77dff88'; ctx.fill();
+    }
+  }
+
+  // Drag hint
+  if(!S.released){
+    ctx.save(); ctx.fillStyle='rgba(77,240,176,0.5)';
+    ctx.font='13px DM Sans, sans-serif'; ctx.textAlign='center';
+    ctx.fillText('Drag the bob to set position, then click Release',W/2,H-20);
+    ctx.restore();
+  }
+
+  // Lab mode badge
+  if(S.mode==='lab'){
+    ctx.save(); ctx.fillStyle='rgba(255,209,102,0.7)';
+    ctx.font='11px DM Mono, monospace'; ctx.textAlign='left';
+    ctx.fillText(`🌡 ${S.temp}°C  |  b = ${damping().toFixed(4)}`,16,H-16);
+    ctx.restore();
+  }
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────────
+function setMode(m){
+  S.mode=m;
+  document.getElementById('btnIdeal').classList.toggle('active',m==='ideal');
+  document.getElementById('btnLab').classList.toggle('active',m==='lab');
+  const p=document.getElementById('modePill');
+  p.textContent=m==='ideal'?'IDEAL MODE':'LAB MODE';
+  p.className='mode-pill'+(m==='lab'?' lab':'');
+  document.getElementById('tempRow').style.display=m==='lab'?'flex':'none';
+  resetSim();
+}
+
+function setSetup(s){
+  S.setup=s;
+  document.querySelectorAll('.sc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('setup_'+s).classList.add('active');
+  document.getElementById('rodRow').style.display=s==='rod'?'flex':'none';
+  // Relabel and rescale length slider for paperclip mode
+  const sliderL=document.getElementById('sliderL');
+  if(s==='paperclip'){
+    document.getElementById('lblLLabel').textContent='No. of clips';
+    sliderL.min=1; sliderL.max=30; sliderL.step=1; sliderL.value=10;
+  } else {
+    document.getElementById('lblLLabel').textContent='Length (L)';
+    sliderL.min=0.10; sliderL.max=1.50; sliderL.step=0.01; sliderL.value=0.50;
+  }
+  resetSim();
+}
+
+function updateParams(){
+  const rawL = parseFloat(document.getElementById('sliderL').value);
+  if(S.setup==='paperclip'){
+    const clips = Math.round(rawL);
+    S.L = clips * 0.05;
+    document.getElementById('lblL').textContent = clips + ' clips';
+  } else {
+    S.L = rawL;
+    document.getElementById('lblL').textContent = S.L.toFixed(2)+' m';
+  }
+  S.releaseAngle = parseFloat(document.getElementById('sliderAngle').value)*Math.PI/180;
+  S.temp   = parseFloat(document.getElementById('sliderTemp').value);
+  S.rodPos = parseFloat(document.getElementById('sliderRod').value);
+  document.getElementById('lblAngle').textContent = Math.round(S.releaseAngle*180/Math.PI)+'°';
+  document.getElementById('lblTemp').textContent  = S.temp+' °C';
+  document.getElementById('lblRod').textContent   = S.rodPos.toFixed(2)+' m';
+  if(!S.released){ S.theta=S.releaseAngle; S.omega=0; }
+  updateInfoBar();
+}
+
+function toggleRelease(){
+  const btn=document.getElementById('btnRelease');
+  if(!S.released){
+    S.released=true; S.running=true;
+    btn.textContent='⏸ Pause'; btn.classList.remove('go');
+    document.getElementById('btnRecord').disabled=false;
+  } else if(S.running){
+    S.running=false; btn.textContent='▶ Resume'; btn.classList.add('go');
+  } else {
+    S.running=true; btn.textContent='⏸ Pause'; btn.classList.remove('go');
+  }
+}
+
+function resetSim(){
+  S.running=false; S.released=false;
+  S.theta=S.releaseAngle; S.omega=0; S.simT=0;
+  S.oscCount=0; S.lastSign=0; S.countingOsc=false;
+  document.getElementById('btnRelease').textContent='▶ Release';
+  document.getElementById('btnRelease').classList.add('go');
+  document.getElementById('btnRecord').disabled=true;
+  document.getElementById('oscNum').textContent='0';
+  resetStopwatch();
+}
+
+function toggleStopwatch(){
+  S.swRunning=!S.swRunning;
+  S.countingOsc=S.swRunning;   // tie oscillation counting to timer
+  if(S.swRunning){
+    // snapshot sign at start so first half-swing isn't miscounted
+    S.lastSign=Math.sign(S.theta);
+    document.getElementById('btnSW').textContent='Stop';
+  } else {
+    document.getElementById('btnSW').textContent='Start';
+  }
+}
+
+function resetStopwatch(){
+  S.swRunning=false; S.swTime=0; S.countingOsc=false;
+  S.oscCount=0; S.lastSign=Math.sign(S.theta);
+  document.getElementById('oscNum').textContent='0';
+  document.getElementById('btnSW').textContent='Start';
+  renderStopwatch(0);
+}
+
+function toggleReveal(){
+  oscRevealed=!oscRevealed;
+  document.getElementById('oscNum').classList.toggle('hidden',!oscRevealed);
+  document.getElementById('btnReveal').textContent=oscRevealed?'Hide':'Reveal';
+}
+
+// ── INFO BAR ───────────────────────────────────────────────────────────────
+function updateInfoBar(){
+  if(S.setup==='paperclip'){
+    const clips=Math.round(S.L/0.05);
+    document.getElementById('infoL').textContent=clips+' clips';
+  } else {
+    document.getElementById('infoL').textContent=S.L.toFixed(2)+' m';
+  }
+  if(S.oscCount>0 && S.swTime>0){
+    document.getElementById('infoT').textContent=(S.swTime/S.oscCount).toFixed(3)+' s';
+  } else {
+    document.getElementById('infoT').textContent='—';
+  }
+  const Leff=effL();
+  document.getElementById('infoTExact').textContent  = exactPeriod(Leff,S.releaseAngle).toFixed(3)+' s';
+  document.getElementById('infoTApprox').textContent = shmPeriod(Leff).toFixed(3)+' s';
+}
+
+// ── DATA ───────────────────────────────────────────────────────────────────
+function recordMeasurement(){
+  if(S.swRunning){ alert('Stop the timer before recording.'); return; }
+  if(S.oscCount<1||S.swTime<=0){ alert('Time at least 1 oscillation first!'); return; }
+  const T=S.swTime/S.oscCount;
+  dataRows.push({n:dataRows.length+1, L:S.L, osc:S.oscCount,
+    t:+S.swTime.toFixed(2), T:+T.toFixed(4), T2:+(T*T).toFixed(5)});
+  renderTable();
+  resetStopwatch();
+}
+
+function renderTable(){
+  document.getElementById('emptyState').style.display='none';
+  const tbl=document.getElementById('dataTable'); tbl.style.display='table';
+  const body=document.getElementById('dataBody'); body.innerHTML='';
+  dataRows.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.n}</td><td>${r.L.toFixed(2)}</td><td>${r.osc}</td><td>${r.t}</td><td>${r.T.toFixed(3)}</td><td>${r.T2.toFixed(4)}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function clearData(){
+  dataRows=[];
+  document.getElementById('emptyState').style.display='block';
+  document.getElementById('dataTable').style.display='none';
+  document.getElementById('graphCanvas').style.display='none';
+}
+
+function downloadCSV(){
+  if(!dataRows.length){alert('No data yet.');return;}
+  let csv='Run,L (m),Oscillations,Time (s),T (s),T² (s²)\n';
+  dataRows.forEach(r=>csv+=`${r.n},${r.L},${r.osc},${r.t},${r.T},${r.T2}\n`);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='pendulum_data.csv'; a.click();
+}
+
+// ── GRAPH ──────────────────────────────────────────────────────────────────
+function showGraph(){
+  if(dataRows.length<2){alert('Need at least 2 data points first.');return;}
+  const gc=document.getElementById('graphCanvas');
+  gc.style.display='block';
+  // wait for layout, then draw
+  requestAnimationFrame(()=>{
+    gc.width=gc.offsetWidth||760;
+    drawGraph();
+    gc.scrollIntoView({behavior:'smooth', block:'nearest'});
+  });
+}
+
+function drawGraph(){
+  const gc=document.getElementById('graphCanvas');
+  const g2=gc.getContext('2d');
+  const GW=gc.width, GH=gc.height;
+  g2.clearRect(0,0,GW,GH);
+  const pad={l:64,r:32,t:38,b:50};
+  const pw=GW-pad.l-pad.r, ph=GH-pad.t-pad.b;
+
+  g2.fillStyle='#0a0c12'; g2.fillRect(0,0,GW,GH);
+
+  const Lv=dataRows.map(r=>r.L), T2v=dataRows.map(r=>r.T2);
+  const maxL=Math.max(...Lv)*1.2, maxT2=Math.max(...T2v)*1.2;
+  const tx=L=>pad.l+L/maxL*pw;
+  const ty=t2=>pad.t+ph-t2/maxT2*ph;
+
+  // Grid lines
+  g2.strokeStyle='rgba(255,255,255,0.04)'; g2.lineWidth=1;
+  for(let i=1;i<=4;i++){
+    g2.beginPath(); g2.moveTo(pad.l,pad.t+ph/4*i); g2.lineTo(pad.l+pw,pad.t+ph/4*i); g2.stroke();
+    g2.beginPath(); g2.moveTo(pad.l+pw/4*i,pad.t); g2.lineTo(pad.l+pw/4*i,pad.t+ph); g2.stroke();
+  }
+
+  // Axes
+  g2.strokeStyle='#3a4a6a'; g2.lineWidth=1.5;
+  g2.beginPath(); g2.moveTo(pad.l,pad.t); g2.lineTo(pad.l,pad.t+ph); g2.lineTo(pad.l+pw,pad.t+ph); g2.stroke();
+
+  // Best fit line
+  const n=dataRows.length;
+  const sL=Lv.reduce((a,b)=>a+b,0), sT=T2v.reduce((a,b)=>a+b,0);
+  const sLL=Lv.reduce((a,b)=>a+b*b,0), sLT=Lv.reduce((a,b,i)=>a+b*T2v[i],0);
+  const slope=(n*sLT-sL*sT)/(n*sLL-sL*sL);
+  const inter=(sT-slope*sL)/n;
+  const gExp=4*Math.PI*Math.PI/slope;
+
+  g2.save(); g2.strokeStyle='rgba(77,240,176,0.4)'; g2.lineWidth=1.5; g2.setLineDash([6,5]);
+  g2.beginPath(); g2.moveTo(tx(0),ty(inter)); g2.lineTo(tx(maxL),ty(slope*maxL+inter)); g2.stroke();
+  g2.restore();
+
+  // Data points
+  dataRows.forEach(r=>{
+    g2.beginPath(); g2.arc(tx(r.L),ty(r.T2),5,0,Math.PI*2);
+    g2.fillStyle='#ffd166'; g2.shadowColor='#ffd16644'; g2.shadowBlur=9; g2.fill(); g2.shadowBlur=0;
+    g2.strokeStyle='#b08010'; g2.lineWidth=1; g2.stroke();
+  });
+
+  // Axis labels
+  g2.fillStyle='#7a8aaa'; g2.font='11px DM Mono, monospace'; g2.textAlign='center';
+  g2.fillText('L (m)', pad.l+pw/2, GH-8);
+  g2.save(); g2.translate(14,pad.t+ph/2); g2.rotate(-Math.PI/2);
+  g2.fillText('T² (s²)',0,0); g2.restore();
+
+  // Tick values
+  g2.font='10px DM Mono, monospace'; g2.fillStyle='#7a8aaa';
+  [0,.25,.5,.75,1].forEach(f=>{
+    const v=maxT2*f; g2.textAlign='right'; g2.fillText(v.toFixed(2),pad.l-6,ty(v)+4);
+    if(f>0){ g2.textAlign='center'; g2.fillText((maxL*f).toFixed(2),tx(maxL*f),pad.t+ph+16); }
+  });
+
+  // Title + result
+  g2.fillStyle='#eef2ff'; g2.font='600 13px DM Sans, sans-serif'; g2.textAlign='left';
+  g2.fillText('T² vs L', pad.l, pad.t-14);
+  g2.fillStyle='#4df0b0'; g2.font='11px DM Mono, monospace'; g2.textAlign='right';
+  g2.fillText(`gradient = ${slope.toFixed(3)} s²/m   →   g = ${gExp.toFixed(2)} m/s²`, GW-pad.r, pad.t-14);
+}
+
+// ── DRAG ───────────────────────────────────────────────────────────────────
+function getCoords(e,touch=false){
+  const r=canvas.getBoundingClientRect(), sx=W/r.width;
+  const s=touch?e.touches[0]:e;
+  return{x:(s.clientX-r.left)*sx, y:(s.clientY-r.top)*sx};
+}
+function tryStartDrag(mx,my){
+  if(S.released)return;
+  const bx=PIVOT_X+Math.sin(S.theta)*S.L*SCALE;
+  const by=PIVOT_Y+Math.cos(S.theta)*S.L*SCALE;
+  // Paperclip: no bob, so allow dragging anywhere in lower half of chain
+  if(S.setup==='paperclip'){
+    const midX=PIVOT_X+Math.sin(S.theta)*S.L*SCALE*0.5;
+    const midY=PIVOT_Y+Math.cos(S.theta)*S.L*SCALE*0.5;
+    if(Math.hypot(mx-bx,my-by)<40||Math.hypot(mx-midX,my-midY)<40) S.dragging=true;
+  } else {
+    if(Math.hypot(mx-bx,my-by)<52) S.dragging=true;
+  }
+}
+function doDrag(mx,my){
+  if(!S.dragging)return;
+  const dx=mx-PIVOT_X, dy=my-PIVOT_Y;
+  S.theta=Math.max(-80*Math.PI/180,Math.min(80*Math.PI/180,Math.atan2(dx,dy)));
+  S.releaseAngle=Math.abs(S.theta);
+  document.getElementById('sliderAngle').value=Math.round(S.releaseAngle*180/Math.PI);
+  document.getElementById('lblAngle').textContent=Math.round(S.releaseAngle*180/Math.PI)+'°';
+  updateInfoBar();
+}
+canvas.addEventListener('mousedown',e=>{const c=getCoords(e);tryStartDrag(c.x,c.y);});
+canvas.addEventListener('mousemove',e=>{const c=getCoords(e);doDrag(c.x,c.y);});
+canvas.addEventListener('mouseup',  ()=>S.dragging=false);
+canvas.addEventListener('mouseleave',()=>S.dragging=false);
+canvas.addEventListener('touchstart',e=>{e.preventDefault();const c=getCoords(e,true);tryStartDrag(c.x,c.y);},{passive:false});
+canvas.addEventListener('touchmove', e=>{e.preventDefault();const c=getCoords(e,true);doDrag(c.x,c.y);},{passive:false});
+canvas.addEventListener('touchend',  ()=>S.dragging=false);
+
+// ── AI ─────────────────────────────────────────────────────────────────────
+function saveKey(){
+  apiKey=document.getElementById('apiKey').value.trim();
+  if(apiKey) document.getElementById('aiBox').innerHTML=
+    `<span class="ai-tag">▸ Physics Guide</span>API key saved! Click a question below for an explanation.`;
+}
+const prompts={
+  large_angle:'A secondary student (age 15–16, Singapore O-Level) is using a pendulum simulation and sees the exact period is longer than T=2π√(L/g) at large angles. Explain why in 3–4 sentences, mentioning sinθ ≈ θ. Be friendly and clear.',
+  rod:'A secondary student (age 15–16, Singapore O-Level) sees the pendulum period change when the string catches a horizontal rod partway down. Explain why in 3–4 sentences, mentioning effective length.',
+  exact_vs_shm:'A secondary student (age 15–16) sees two period values: one from exact numerical integration (RK4 of θ̈=−(g/L)sinθ) and one from SHM (T=2π√(L/g)). Explain the difference in 3–4 sentences and when they agree.',
+  lab_mode:'A secondary student (age 15–16) is comparing an ideal (no air resistance) pendulum vs a lab-mode pendulum with temperature-dependent damping. Explain why real pendulums slow down and why temperature affects it. 3–4 sentences.',
+};
+async function askAI(key){
+  const box=document.getElementById('aiBox');
+  if(!apiKey){box.innerHTML=`<span class="ai-tag">▸ Physics Guide</span><em style="color:var(--text-dim)">Please save an Anthropic API key first.</em>`;return;}
+  box.innerHTML=`<span class="ai-tag">▸ Physics Guide</span><em style="color:var(--text-dim)">Thinking…</em>`;
+  box.classList.add('lit');
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:350,messages:[{role:'user',content:prompts[key]}]})
+    });
+    const d=await res.json();
+    box.innerHTML=`<span class="ai-tag">▸ Physics Guide</span>${d.content?.[0]?.text||'No response.'}`;
+  }catch(err){
+    box.innerHTML=`<span class="ai-tag">▸ Physics Guide</span><em style="color:var(--red)">Error: ${err.message}</em>`;
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+updateParams();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

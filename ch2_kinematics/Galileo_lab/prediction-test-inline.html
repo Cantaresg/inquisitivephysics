@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prediction & Bridge — Test Harness</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+:root {
+  --bg:#0a0c12; --surface:#111520; --surface2:#161b28;
+  --border:#252d42; --border2:#2e3850;
+  --accent:#4df0b0; --accent-dim:rgba(77,240,176,0.12);
+  --gold:#ffd166; --gold-dim:rgba(255,209,102,0.12);
+  --purple:#c77dff; --red:#ff6b6b;
+  --text:#eef2ff; --text-mid:#a8b4d0; --text-dim:#6b7a99;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+header {
+  display: flex; align-items: center; padding: 0 20px; height: 48px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  gap: 12px; flex-shrink: 0;
+}
+.logo { font-size: .95rem; font-weight: 700; color: var(--accent); }
+.logo em { color: var(--text); font-style: normal; }
+.htag {
+  font-size: .7rem; font-family: 'DM Mono', monospace;
+  color: var(--text-dim); border: 1px solid var(--border2);
+  border-radius: 12px; padding: 2px 10px;
+}
+.app { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+/* Main content — scrollable */
+.main-col {
+  flex: 1; overflow-y: auto; background: var(--bg);
+}
+
+/* Stage tabs */
+.stage-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+  padding: 0 20px;
+}
+.stage-tab {
+  font-family: 'DM Mono', monospace; font-size: .72rem;
+  padding: 10px 18px; cursor: pointer; color: var(--text-dim);
+  border-bottom: 2px solid transparent; transition: all .15s;
+  letter-spacing: .05em;
+}
+.stage-tab:hover { color: var(--text); }
+.stage-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Recall banner injection zone */
+#recallZone { padding: 16px 20px 0; }
+
+/* Content area */
+#stageContainer { min-height: 400px; }
+
+/* Side panel */
+.side {
+  width: 280px; flex-shrink: 0; display: flex; flex-direction: column;
+  background: var(--surface); border-left: 1px solid var(--border); overflow-y: auto;
+}
+.ps { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+.ps:last-child { border-bottom: none; }
+.ps-title {
+  font-size: .6rem; font-family: 'DM Mono', monospace;
+  color: var(--text-dim); letter-spacing: .1em;
+  text-transform: uppercase; margin-bottom: 10px; font-weight: 500;
+}
+.btn {
+  font-family: 'DM Sans', sans-serif; font-size: .8rem; font-weight: 600;
+  padding: 7px 14px; border-radius: 7px; border: 1.5px solid var(--border2);
+  background: var(--surface2); color: var(--text); cursor: pointer;
+  transition: all .15s; width: 100%; margin-bottom: 6px; text-align: left;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.btn.go { background: var(--accent); color: #050a0a; border-color: var(--accent); font-weight: 700; }
+.btn.go:hover { background: #38d49a; }
+.btn.danger:hover { border-color: var(--red); color: var(--red); background: rgba(255,107,107,.1); }
+.chip {
+  display: block; font-family: 'DM Mono', monospace; font-size: .62rem;
+  padding: 3px 9px; border-radius: 10px; border: 1px solid var(--border2);
+  color: var(--text-dim); margin-bottom: 5px; transition: all .3s;
+}
+.chip.active { border-color: var(--gold); color: var(--gold); }
+.chip.done   { border-color: var(--accent); color: var(--accent); }
+.log {
+  font-family: 'DM Mono', monospace; font-size: .66rem;
+  color: var(--text-dim); line-height: 1.85; max-height: 280px; overflow-y: auto;
+}
+.log .ok   { color: var(--accent); }
+.log .info { color: var(--gold); }
+.log .warn { color: var(--red); }
+.resp-lbl {
+  font-size: .58rem; font-family: 'DM Mono', monospace;
+  color: var(--text-dim); letter-spacing: .07em; margin-bottom: 3px; margin-top: 8px;
+}
+.resp-lbl:first-child { margin-top: 0; }
+.resp-block {
+  background: var(--bg); border: 1px solid var(--border2); border-radius: 6px;
+  padding: 6px 9px; font-family: 'DM Mono', monospace; font-size: .66rem;
+  color: var(--text-mid); line-height: 1.6; white-space: pre-wrap;
+  word-break: break-word; min-height: 28px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Physics<em>Sims</em></div>
+  <div class="htag">draw-prediction.js · TEST HARNESS</div>
+</header>
+
+<div class="app">
+  <div class="main-col">
+    <div class="stage-tabs">
+      <div class="stage-tab active" id="tab-s1" onclick="showTab('s1')">Stage 1 — Prediction</div>
+      <div class="stage-tab"        id="tab-s2" onclick="showTab('s2')">Stage 2 — Recall Banner</div>
+      <div class="stage-tab"        id="tab-s3" onclick="showTab('s3')">Stage 3 — Bridge MCQ</div>
+    </div>
+    <div id="recallZone"></div>
+    <div id="stageContainer"></div>
+  </div>
+
+  <div class="side">
+    <div class="ps">
+      <div class="ps-title">Controls</div>
+      <button class="btn go" onclick="startCurrent()">▶ Start / Restart</button>
+      <button class="btn danger" onclick="resetCurrent()">↺ Reset</button>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Stage Status</div>
+      <div class="chip" id="chip-s1">Stage 1 — Prediction</div>
+      <div class="chip" id="chip-s2">Stage 2 — Ramp (recall)</div>
+      <div class="chip" id="chip-s3">Stage 3 — Bridge</div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Captured Responses</div>
+      <div class="resp-lbl">Stage 1 (ramp_prediction)</div>
+      <div class="resp-block" id="resp-s1">—</div>
+      <div class="resp-lbl">Stage 3 (ramp_discovery)</div>
+      <div class="resp-block" id="resp-s3">—</div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Console</div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DataLogger stub ──────────────────────────────────────────────────── -->
+<script>
+const DataLogger = {
+  _store: {},
+  getAlias() { return 'test_student'; },
+  log(key, data) {
+    this._store[key] = data;
+    console.log('[DataLogger]', key, data);
+  },
+  getResponse(key) { return this._store[key] ?? null; },
+};
+</script>
+
+<!-- ── prediction-data.js inlined ──────────────────────────────────────── -->
+<script>
+const PredictionData = {
+
+  rampPrediction: {
+    preamble: `You are about to run a ramp experiment. Two balls — one heavy, one light —
+will be released from the top of a ramp at the same time.`,
+    question: 'Which ball do you think will reach the bottom first?',
+    options: [
+      { id: 'heavy', label: 'Heavy ball',  hint: 'The heavier ball reaches the bottom first.' },
+      { id: 'light', label: 'Light ball',  hint: 'The lighter ball reaches the bottom first.' },
+      { id: 'same',  label: 'Same time',   hint: 'Both balls reach the bottom at the same time.' },
+      {
+        id: 'other', label: 'Other', hint: null,
+        placeholder: 'Describe what you think will happen…',
+      },
+    ],
+    confidence: {
+      label: 'How confident are you in your prediction?',
+      levels: [
+        { id: 'unsure',    label: 'Unsure' },
+        { id: 'low',       label: 'Low' },
+        { id: 'medium',    label: 'Medium' },
+        { id: 'high',      label: 'High' },
+        { id: 'very_sure', label: 'Very sure' },
+      ],
+    },
+    recallBanner: 'Your prediction: {choice} — confidence: {confidence}',
+    ui: {
+      submitBtn:      'Lock in prediction →',
+      submitLockHint: 'Select an option to continue.',
+      otherMinChars:  10,
+    },
+  },
+
+  bridge: {
+    preamble: `You just ran the ramp experiment. Both balls — heavy and light — slid down
+in the same time, no matter how you changed the length.`,
+    question: 'Rate how true you think each statement is.',
+    likertLabels: [
+      'Definitely false',
+      'Maybe false',
+      'Not sure',
+      'Maybe true',
+      'Definitely true',
+    ],
+    statements: [
+      {
+        id: 'B_S1',
+        text: 'Without air resistance, the mass of an object does not affect how long it takes to fall.',
+        correct: true,
+        target: [3, 4],
+        explanation: 'Correct direction. On the ramp, the acceleration is g sinθ — mass cancels out completely. The same argument applies to free fall: both the driving force (gravity) and the resistance to motion (inertia) scale with mass, so they cancel. Without air resistance, all objects fall at the same rate regardless of mass.',
+      },
+      {
+        id: 'B_S2',
+        text: 'Objects always fall at the same rate — mass never matters, even in air.',
+        correct: false,
+        target: [0, 1],
+        explanation: 'This goes too far. In a vacuum, yes — mass cancels and all objects fall together. But in air, drag force depends on speed and shape, while the driving force (gravity) depends on mass. Heavier objects have a higher terminal velocity in air, so mass does matter when air resistance is present.',
+      },
+      {
+        id: 'B_S3',
+        text: 'The ramp result only applies to ramps — it tells us nothing about objects falling straight down.',
+        correct: false,
+        target: [0, 1],
+        explanation: 'The ramp is a controlled version of free fall. The physics is identical — gravity acts on a mass, and acceleration is g sinθ, which contains no mass term. Galileo used the ramp precisely because it slows the motion enough to measure. The conclusion generalises to free fall.',
+      },
+      {
+        id: 'B_S4',
+        text: 'Heavier objects still fall faster — the ramp result must have been affected by friction cancelling the mass difference.',
+        correct: false,
+        target: [0, 1],
+        explanation: 'Even with friction, mass still cancels. The friction force is μmg cosθ and the driving force is mg sinθ — both contain m, so it divides out. The result is independent of mass on a rough or smooth ramp. The ramp experiment was not a fluke.',
+      },
+    ],
+    freeText: {
+      id: 'B_FREE',
+      label: 'Any other thoughts? (optional)',
+      placeholder: 'Write any questions or ideas here…',
+    },
+    ui: {
+      submitBtn:      'Submit →',
+      continueBtn:    'Continue →',
+      submitLockHint: 'Rate all statements to continue.',
+    },
+  },
+};
+</script>
+
+<!-- ── draw-prediction.js inlined ──────────────────────────────────────── -->
+<script>
+const DrawPrediction = (() => {
+
+  const CSS = `
+    .pred-wrap {
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text, #eef2ff);
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 28px 20px 44px;
+    }
+    .pred-preamble {
+      font-size: 0.88rem; line-height: 1.75;
+      color: var(--text-mid, #a8b4d0); margin-bottom: 22px;
+      padding: 14px 18px; background: var(--surface, #111520);
+      border: 1px solid var(--border, #252d42); border-radius: 10px;
+      white-space: pre-line;
+    }
+    .pred-card {
+      background: var(--surface, #111520); border: 1px solid var(--border, #252d42);
+      border-radius: 14px; padding: 24px 24px 20px; margin-bottom: 16px;
+    }
+    .pred-card-label {
+      font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em;
+      color: var(--text-dim, #6b7a99); text-transform: uppercase; margin-bottom: 10px;
+    }
+    .pred-question {
+      font-size: 0.95rem; font-weight: 600; color: var(--text, #eef2ff);
+      margin-bottom: 18px; line-height: 1.5;
+    }
+    .pred-opts { display: flex; flex-direction: column; gap: 8px; }
+    .pred-opt {
+      display: flex; align-items: flex-start; gap: 12px; padding: 11px 14px;
+      border-radius: 9px; border: 1.5px solid var(--border2, #2e3850);
+      background: var(--bg, #0a0c12); cursor: pointer;
+      transition: border-color 0.15s, background 0.15s; user-select: none;
+    }
+    .pred-opt:hover:not(.locked) { border-color: var(--accent, #4df0b0); background: rgba(77,240,176,0.06); }
+    .pred-opt.selected { border-color: var(--accent, #4df0b0); background: rgba(77,240,176,0.10); }
+    .pred-opt.locked { cursor: default; }
+    .pred-radio {
+      width: 17px; height: 17px; border-radius: 50%; border: 1.5px solid var(--border2, #2e3850);
+      flex-shrink: 0; margin-top: 2px; display: flex; align-items: center;
+      justify-content: center; transition: all 0.15s; background: transparent;
+    }
+    .pred-opt.selected .pred-radio { border-color: var(--accent, #4df0b0); background: var(--accent, #4df0b0); }
+    .pred-radio-dot { width: 7px; height: 7px; border-radius: 50%; background: #050a0a; display: none; }
+    .pred-opt.selected .pred-radio-dot { display: block; }
+    .pred-opt-text { font-size: 0.85rem; color: var(--text-mid, #a8b4d0); line-height: 1.5; flex: 1; }
+    .pred-opt.selected .pred-opt-text { color: var(--text, #eef2ff); }
+    .pred-freetext-wrap { display: none; padding: 8px 0 2px; }
+    .pred-freetext-wrap.open { display: block; }
+    .pred-freetext {
+      width: 100%; background: var(--surface, #111520); border: 1.5px solid var(--border2, #2e3850);
+      border-radius: 8px; padding: 8px 10px; font-family: 'DM Mono', monospace; font-size: 0.76rem;
+      color: var(--text, #eef2ff); resize: vertical; min-height: 56px; outline: none;
+      box-sizing: border-box; transition: border-color 0.15s;
+    }
+    .pred-freetext:focus { border-color: var(--purple, #c77dff); }
+    .pred-freetext::placeholder { color: var(--text-dim, #6b7a99); }
+    .pred-charcount { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--text-dim, #6b7a99); text-align: right; margin-top: 4px; transition: color 0.2s; }
+    .pred-charcount.ready { color: var(--accent, #4df0b0); }
+    .pred-confidence { margin-top: 20px; padding: 16px 18px; background: var(--bg, #0a0c12); border: 1.5px solid var(--border2, #2e3850); border-radius: 10px; }
+    .pred-conf-label { font-size: 0.8rem; font-weight: 600; color: var(--text, #eef2ff); margin-bottom: 14px; }
+    .pred-conf-track { display: flex; gap: 6px; align-items: stretch; }
+    .pred-conf-btn {
+      flex: 1; padding: 8px 4px; border-radius: 7px; border: 1.5px solid var(--border2, #2e3850);
+      background: var(--surface, #111520); color: var(--text-dim, #6b7a99);
+      font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 500;
+      cursor: pointer; text-align: center; transition: all 0.15s; line-height: 1.3;
+    }
+    .pred-conf-btn:hover:not(.locked) { border-color: var(--gold, #ffd166); color: var(--gold, #ffd166); background: rgba(255,209,102,0.07); }
+    .pred-conf-btn.selected { border-color: var(--gold, #ffd166); background: rgba(255,209,102,0.14); color: var(--gold, #ffd166); font-weight: 700; }
+    .pred-conf-btn.locked { cursor: default; }
+    .pred-likert-row { padding: 14px 0; border-bottom: 1px solid var(--border, #252d42); }
+    .pred-likert-row:last-child { border-bottom: none; }
+    .pred-stmt-text { font-size: 0.85rem; color: var(--text-mid, #a8b4d0); line-height: 1.6; margin-bottom: 12px; }
+    .pred-likert-track { display: flex; gap: 5px; }
+    .pred-likert-btn {
+      flex: 1; padding: 7px 3px; border-radius: 6px; border: 1.5px solid var(--border2, #2e3850);
+      background: var(--bg, #0a0c12); color: var(--text-dim, #6b7a99);
+      font-family: 'DM Sans', sans-serif; font-size: 0.65rem; font-weight: 500;
+      cursor: pointer; text-align: center; transition: all 0.15s; line-height: 1.3;
+    }
+    .pred-likert-btn:hover:not(.locked) { border-color: var(--accent, #4df0b0); color: var(--accent, #4df0b0); background: rgba(77,240,176,0.06); }
+    .pred-likert-btn.selected { border-color: var(--accent, #4df0b0); background: rgba(77,240,176,0.12); color: var(--accent, #4df0b0); font-weight: 700; }
+    .pred-likert-btn.locked { cursor: default; }
+    .pred-likert-btn[data-idx="0"].selected, .pred-likert-btn[data-idx="1"].selected { border-color: var(--red, #ff6b6b); background: rgba(255,107,107,0.10); color: var(--red, #ff6b6b); }
+    .pred-likert-btn[data-idx="0"]:hover:not(.locked), .pred-likert-btn[data-idx="1"]:hover:not(.locked) { border-color: var(--red, #ff6b6b); color: var(--red, #ff6b6b); background: rgba(255,107,107,0.06); }
+    .pred-likert-btn[data-idx="2"].selected { border-color: var(--gold, #ffd166); background: rgba(255,209,102,0.10); color: var(--gold, #ffd166); }
+    .pred-likert-btn[data-idx="2"]:hover:not(.locked) { border-color: var(--gold, #ffd166); color: var(--gold, #ffd166); background: rgba(255,209,102,0.06); }
+    .pred-reveal { display: none; margin-top: 10px; padding: 9px 13px; border-radius: 7px; font-size: 0.78rem; line-height: 1.65; animation: pred-fadein 0.3s ease; }
+    .pred-reveal.show { display: block; }
+    @keyframes pred-fadein { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+    .pred-reveal.correct { background: rgba(77,240,176,0.08); border: 1px solid rgba(77,240,176,0.25); }
+    .pred-reveal.wrong   { background: rgba(255,107,107,0.07); border: 1px solid rgba(255,107,107,0.20); }
+    .pred-reveal.neutral { background: rgba(255,209,102,0.07); border: 1px solid rgba(255,209,102,0.20); }
+    .pred-reveal-badge { font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.1em; font-weight: 600; margin-bottom: 5px; }
+    .pred-reveal.correct .pred-reveal-badge { color: var(--accent, #4df0b0); }
+    .pred-reveal.wrong   .pred-reveal-badge { color: var(--red, #ff6b6b); }
+    .pred-reveal.neutral .pred-reveal-badge { color: var(--gold, #ffd166); }
+    .pred-reveal-text { color: var(--text-mid, #a8b4d0); }
+    .pred-footer { margin-top: 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .pred-hint { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--text-dim, #6b7a99); }
+    .pred-btn {
+      font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700;
+      padding: 9px 22px; border-radius: 8px; cursor: pointer;
+      border: 1.5px solid var(--accent, #4df0b0); background: var(--accent, #4df0b0);
+      color: #050a0a; transition: background 0.15s, transform 0.1s;
+    }
+    .pred-btn:hover { background: #38d49a; }
+    .pred-btn:active { transform: scale(0.97); }
+    .pred-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; background: transparent; color: var(--text-dim, #6b7a99); border-color: var(--border2, #2e3850); }
+    .pred-cont-btn { display: none; }
+    .pred-recall {
+      display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+      background: rgba(255,209,102,0.08); border: 1px solid rgba(255,209,102,0.25);
+      border-radius: 9px; margin-bottom: 14px; font-size: 0.8rem;
+      color: var(--text-mid, #a8b4d0); line-height: 1.5;
+    }
+    .pred-recall-icon { font-size: 1rem; flex-shrink: 0; }
+    .pred-recall strong { color: var(--gold, #ffd166); }
+    .pred-complete {
+      text-align: center; padding: 28px 20px;
+      background: rgba(77,240,176,0.06); border: 1px solid rgba(77,240,176,0.18);
+      border-radius: 12px; margin-top: 8px; display: none;
+    }
+    .pred-complete.visible { display: block; }
+    .pred-complete-title { font-size: 1rem; font-weight: 700; color: var(--accent, #4df0b0); margin-bottom: 6px; }
+    .pred-complete-sub { font-size: 0.8rem; color: var(--text-dim, #6b7a99); line-height: 1.65; }
+  `;
+
+  function _injectStyles() {
+    if (document.getElementById('pred-styles')) return;
+    const s = document.createElement('style'); s.id = 'pred-styles'; s.textContent = CSS;
+    document.head.appendChild(s);
+  }
+
+  function _log(key, data) {
+    try { if (typeof DataLogger !== 'undefined' && DataLogger.log) DataLogger.log(key, data); } catch(e) {}
+  }
+
+  function _el(tag, props = {}) {
+    const e = document.createElement(tag);
+    Object.entries(props).forEach(([k, v]) => {
+      if (k === 'className') e.className = v;
+      else if (k === 'textContent') e.textContent = v;
+      else if (k === 'innerHTML') e.innerHTML = v;
+      else e.setAttribute(k, v);
+    });
+    return e;
+  }
+
+  function buildRecallBanner(containerEl, storedResponse) {
+    if (!storedResponse) return;
+    const data = PredictionData.rampPrediction;
+    const opt  = data.options.find(o => o.id === storedResponse.choice);
+    const conf = data.confidence.levels.find(c => c.id === storedResponse.confidence);
+    const choiceLabel = opt
+      ? (opt.id === 'other' ? `Other — "${storedResponse.other_text || '…'}"` : opt.label)
+      : storedResponse.choice;
+    const confLabel = conf ? conf.label : storedResponse.confidence;
+    const banner = _el('div', { className: 'pred-recall' });
+    banner.innerHTML =
+      `<span class="pred-recall-icon">💡</span>` +
+      `<span>Your prediction: <strong>${choiceLabel}</strong> &nbsp;·&nbsp; ` +
+      `Confidence: <strong>${confLabel}</strong></span>`;
+    containerEl.insertBefore(banner, containerEl.firstChild);
+  }
+
+  // ── STAGE 1 ───────────────────────────────────────────────────────────────
+  function createRampPrediction(containerEl) {
+    _injectStyles();
+    const data = PredictionData.rampPrediction;
+    let _onComplete = null, _selectedId = null, _otherText = '', _confidenceId = null, _submitted = false;
+
+    function start() {
+      containerEl.innerHTML = '';
+      const wrap = _el('div', { className: 'pred-wrap' });
+      wrap.appendChild(_el('div', { className: 'pred-preamble', textContent: data.preamble }));
+      const card = _el('div', { className: 'pred-card' });
+      card.appendChild(_el('div', { className: 'pred-card-label', textContent: '▸ Make your prediction' }));
+      card.appendChild(_el('div', { className: 'pred-question', textContent: data.question }));
+
+      const optsWrap = _el('div', { className: 'pred-opts' });
+      data.options.forEach(opt => {
+        const row = _el('div', { className: 'pred-opt' }); row.dataset.id = opt.id;
+        const radio = _el('div', { className: 'pred-radio' });
+        radio.appendChild(_el('div', { className: 'pred-radio-dot' }));
+        row.appendChild(radio);
+        const textWrap = _el('div', { style: 'flex:1;min-width:0;' });
+        textWrap.appendChild(_el('div', { className: 'pred-opt-text', textContent: opt.label }));
+        if (opt.id === 'other') {
+          const ftWrap = _el('div', { className: 'pred-freetext-wrap', id: 'pred-ft-wrap' });
+          const ta = _el('textarea', { className: 'pred-freetext', id: 'pred-ft-other', placeholder: opt.placeholder || 'Describe your thinking…' });
+          ta.rows = 3;
+          const ctr = _el('div', { className: 'pred-charcount', id: 'pred-ft-ctr' });
+          const min = data.ui.otherMinChars;
+          ctr.textContent = `${min} characters needed`;
+          ta.addEventListener('input', () => {
+            _otherText = ta.value;
+            const left = Math.max(0, min - ta.value.trim().length);
+            ctr.textContent = left ? `${left} more character${left===1?'':'s'} needed` : '✓ Ready';
+            ctr.classList.toggle('ready', !left);
+            _updateSubmit();
+          });
+          ftWrap.appendChild(ta); ftWrap.appendChild(ctr); textWrap.appendChild(ftWrap);
+        }
+        row.appendChild(textWrap);
+        row.addEventListener('click', () => {
+          if (_submitted) return;
+          optsWrap.querySelectorAll('.pred-opt').forEach(r => r.classList.remove('selected'));
+          const ft = document.getElementById('pred-ft-wrap');
+          if (ft) ft.classList.remove('open');
+          row.classList.add('selected'); _selectedId = opt.id;
+          if (opt.id === 'other') {
+            const ft2 = document.getElementById('pred-ft-wrap');
+            if (ft2) { ft2.classList.add('open'); document.getElementById('pred-ft-other')?.focus(); }
+          }
+          _updateSubmit();
+        });
+        optsWrap.appendChild(row);
+      });
+      card.appendChild(optsWrap);
+
+      const confWrap = _el('div', { className: 'pred-confidence' });
+      confWrap.appendChild(_el('div', { className: 'pred-conf-label', textContent: data.confidence.label }));
+      const track = _el('div', { className: 'pred-conf-track' });
+      data.confidence.levels.forEach(lvl => {
+        const btn = _el('button', { className: 'pred-conf-btn', textContent: lvl.label });
+        btn.dataset.id = lvl.id;
+        btn.addEventListener('click', () => {
+          if (_submitted) return;
+          track.querySelectorAll('.pred-conf-btn').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected'); _confidenceId = lvl.id; _updateSubmit();
+        });
+        track.appendChild(btn);
+      });
+      confWrap.appendChild(track); card.appendChild(confWrap);
+
+      const footer = _el('div', { className: 'pred-footer' });
+      const hint   = _el('span', { className: 'pred-hint', id: 'pred-hint', textContent: data.ui.submitLockHint });
+      const btn    = _el('button', { className: 'pred-btn', id: 'pred-submit', textContent: data.ui.submitBtn });
+      btn.disabled = true;
+      btn.addEventListener('click', _submit);
+      footer.appendChild(hint); footer.appendChild(btn); card.appendChild(footer);
+      wrap.appendChild(card);
+
+      const banner = _el('div', { className: 'pred-complete', id: 'pred-complete' });
+      banner.innerHTML = `<div class="pred-complete-title">✓ Prediction locked in</div><div class="pred-complete-sub">Head to the ramp experiment to find out.</div>`;
+      wrap.appendChild(banner);
+      containerEl.appendChild(wrap);
+    }
+
+    function _updateSubmit() {
+      const btn = document.getElementById('pred-submit');
+      const hint = document.getElementById('pred-hint');
+      if (!btn) return;
+      if (!_selectedId) { btn.disabled = true; hint.textContent = data.ui.submitLockHint; return; }
+      if (_selectedId === 'other') {
+        const min = data.ui.otherMinChars;
+        const txt = (document.getElementById('pred-ft-other')?.value || '').trim();
+        if (txt.length < min) { btn.disabled = true; hint.textContent = 'Please describe your thinking in the text box.'; return; }
+      }
+      if (!_confidenceId) { btn.disabled = true; hint.textContent = 'Please rate your confidence.'; return; }
+      btn.disabled = false; hint.textContent = '';
+    }
+
+    function _submit() {
+      if (_submitted) return; _submitted = true;
+      containerEl.querySelectorAll('.pred-opt').forEach(r => r.classList.add('locked'));
+      containerEl.querySelectorAll('.pred-conf-btn').forEach(b => b.classList.add('locked'));
+      const submitBtn = document.getElementById('pred-submit');
+      if (submitBtn) submitBtn.style.display = 'none';
+      const hint = document.getElementById('pred-hint'); if (hint) hint.textContent = '';
+      const response = { choice: _selectedId, other_text: _selectedId==='other'?_otherText.trim():'', confidence: _confidenceId, timestamp: Date.now() };
+      _log('ramp_prediction', response);
+      const banner = document.getElementById('pred-complete'); if (banner) banner.classList.add('visible');
+      if (_onComplete) _onComplete(response);
+    }
+
+    function onComplete(fn) { _onComplete = fn; }
+    function reset() { _submitted = false; _selectedId = null; _confidenceId = null; _otherText = ''; start(); }
+    start();
+    return { onComplete, reset };
+  }
+
+  // ── STAGE 3 ───────────────────────────────────────────────────────────────
+  function createBridge(containerEl) {
+    _injectStyles();
+    const data = PredictionData.bridge;
+    let _onComplete = null, _ratings = {}, _freeText = '', _submitted = false;
+
+    function start() {
+      containerEl.innerHTML = '';
+      const wrap = _el('div', { className: 'pred-wrap' });
+      wrap.appendChild(_el('div', { className: 'pred-preamble', textContent: data.preamble }));
+
+      const card = _el('div', { className: 'pred-card' });
+      card.appendChild(_el('div', { className: 'pred-card-label', textContent: '▸ Bridge question' }));
+      card.appendChild(_el('div', { className: 'pred-question', textContent: data.question }));
+
+      data.statements.forEach(stmt => {
+        const row = _el('div', { className: 'pred-likert-row' });
+        row.appendChild(_el('div', { className: 'pred-stmt-text', textContent: stmt.text }));
+        const track = _el('div', { className: 'pred-likert-track' });
+        data.likertLabels.forEach((lbl, idx) => {
+          const btn = _el('button', { className: 'pred-likert-btn', textContent: lbl });
+          btn.dataset.idx = idx; btn.dataset.stmt = stmt.id;
+          btn.addEventListener('click', () => {
+            if (_submitted) return;
+            track.querySelectorAll('.pred-likert-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected'); _ratings[stmt.id] = idx; _updateSubmit();
+          });
+          track.appendChild(btn);
+        });
+        row.appendChild(track);
+        row.appendChild(_el('div', { className: 'pred-reveal', id: `pred-rev-${stmt.id}` }));
+        card.appendChild(row);
+      });
+
+      // Free text
+      const ftSection = _el('div', { className: 'pred-likert-row' });
+      ftSection.appendChild(_el('div', { className: 'pred-stmt-text', textContent: data.freeText.label }));
+      const ta = _el('textarea', { className: 'pred-freetext', id: 'bridge-free', placeholder: data.freeText.placeholder });
+      ta.rows = 3; ta.style.marginTop = '6px';
+      ta.addEventListener('input', () => { _freeText = ta.value; });
+      ftSection.appendChild(ta); card.appendChild(ftSection);
+
+      const footer = _el('div', { className: 'pred-footer' });
+      const hint   = _el('span', { className: 'pred-hint', id: 'bridge-hint', textContent: data.ui.submitLockHint });
+      const subBtn = _el('button', { className: 'pred-btn', id: 'bridge-submit', textContent: data.ui.submitBtn });
+      subBtn.disabled = true; subBtn.addEventListener('click', _submit);
+      const contBtn = _el('button', { className: 'pred-btn pred-cont-btn', id: 'bridge-cont', textContent: data.ui.continueBtn });
+      contBtn.addEventListener('click', () => { if (_onComplete) _onComplete(_buildResponse()); });
+      footer.appendChild(hint); footer.appendChild(subBtn); footer.appendChild(contBtn);
+      card.appendChild(footer); wrap.appendChild(card);
+
+      const banner = _el('div', { className: 'pred-complete', id: 'bridge-complete' });
+      banner.innerHTML = `<div class="pred-complete-title">✓ Responses submitted</div><div class="pred-complete-sub">Continue to the Drop Lab to test your ideas experimentally.</div>`;
+      wrap.appendChild(banner);
+      containerEl.appendChild(wrap);
+    }
+
+    function _updateSubmit() {
+      const btn = document.getElementById('bridge-submit');
+      const hint = document.getElementById('bridge-hint');
+      if (!btn) return;
+      const allRated = data.statements.every(s => _ratings[s.id] !== undefined);
+      btn.disabled = !allRated;
+      hint.textContent = allRated ? '' : data.ui.submitLockHint;
+    }
+
+    function _buildResponse() {
+      return {
+        ratings: { ..._ratings }, free_text: _freeText.trim(), timestamp: Date.now(),
+        scores: data.statements.map(stmt => ({ id: stmt.id, rated: _ratings[stmt.id] ?? -1, correct: stmt.target.includes(_ratings[stmt.id] ?? -1) })),
+      };
+    }
+
+    function _submit() {
+      if (_submitted) return; _submitted = true;
+      containerEl.querySelectorAll('.pred-likert-btn').forEach(b => b.classList.add('locked'));
+      const subBtn = document.getElementById('bridge-submit'); if (subBtn) subBtn.style.display = 'none';
+      const hint = document.getElementById('bridge-hint'); if (hint) hint.textContent = '';
+      const response = _buildResponse();
+      _log('ramp_discovery', response);
+      data.statements.forEach((stmt, i) => { setTimeout(() => _revealStatement(stmt), i * 150); });
+      setTimeout(() => {
+        const contBtn = document.getElementById('bridge-cont');
+        if (contBtn) contBtn.style.display = 'inline-block';
+        const banner = document.getElementById('bridge-complete');
+        if (banner) banner.classList.add('visible');
+      }, data.statements.length * 150 + 300);
+    }
+
+    function _revealStatement(stmt) {
+      const rev = document.getElementById(`pred-rev-${stmt.id}`); if (!rev) return;
+      const rated = _ratings[stmt.id] ?? -1;
+      const inTarget = stmt.target.includes(rated);
+      let cls = inTarget ? 'correct' : 'wrong';
+      let badge = inTarget ? '▸ GOOD THINKING' : '▸ WORTH RECONSIDERING';
+      if (!inTarget && rated === 2) { cls = 'neutral'; badge = '▸ THINK IT THROUGH'; }
+      rev.className = `pred-reveal ${cls} show`;
+      rev.innerHTML = `<div class="pred-reveal-badge">${badge}</div><div class="pred-reveal-text">${stmt.explanation}</div>`;
+    }
+
+    function onComplete(fn) { _onComplete = fn; }
+    function reset() { _submitted = false; _ratings = {}; _freeText = ''; start(); }
+    start();
+    return { onComplete, reset };
+  }
+
+  return { createRampPrediction, createBridge, buildRecallBanner };
+})();
+</script>
+
+<!-- ── Test harness controller ──────────────────────────────────────────── -->
+<script>
+let _currentTab  = 's1';
+let _pred        = null;
+let _bridge      = null;
+let _s1Response  = null;
+
+const container  = document.getElementById('stageContainer');
+const recallZone = document.getElementById('recallZone');
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function showTab(id, silent) {
+  _currentTab = id;
+  ['s1','s2','s3'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === id);
+  });
+  recallZone.innerHTML = '';
+  if (id === 's2') _loadS2();
+  if (!silent) log(`Switched to ${id}`);
+}
+
+function _loadS2() {
+  DrawPrediction.buildRecallBanner(recallZone, _s1Response);
+  container.innerHTML = `
+    <div style="margin:16px 20px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);overflow:hidden;">
+      <div style="background:#0a0c12;height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-bottom:1px solid var(--border);">
+        <div style="font-size:2rem;opacity:.2">📐</div>
+        <div style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--text-dim);text-align:center;line-height:1.8;">
+          DrawRamp canvas renders here in the full shell.<br>
+          Recall banner above stays visible until the experiment ends.
+        </div>
+      </div>
+      <div style="padding:14px 20px;display:flex;align-items:center;gap:14px;">
+        <span style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--text-dim);">
+          ▸ In the real shell this advances automatically when both balls land.
+        </span>
+        <button class="btn go" style="margin:0;width:auto;flex-shrink:0;"
+          onclick="simulateRampComplete()">Simulate experiment complete →</button>
+      </div>
+    </div>`;
+  updateChip('s2', 'active');
+}
+
+function simulateRampComplete() {
+  log('<span class="info">Ramp experiment complete — advancing to Stage 3…</span>');
+  updateChip('s2', 'done');
+  setTimeout(() => _loadS3(), 600);
+}
+
+function _loadS3() {
+  showTab('s3', true);
+  recallZone.innerHTML = '';
+  container.innerHTML = '';
+  // createBridge auto-renders — just wire the callback
+  _bridge = DrawPrediction.createBridge(container);
+  _bridge.onComplete(resp => {
+    document.getElementById('resp-s3').textContent = JSON.stringify(resp, null, 2);
+    updateChip('s3', 'done');
+    log(`<span class="ok">Stage 3 complete — ramp_discovery logged, Drop Lab now unlocked.</span>`);
+    resp.scores.forEach(sc => {
+      const icon = sc.correct ? '<span class="ok">✓</span>' : '<span class="warn">✗</span>';
+      log(`  ${icon} ${sc.id} — rated ${sc.rated}`);
+    });
+    if (resp.free_text) log(`  Free text: "${resp.free_text}"`);
+  });
+  updateChip('s3', 'active');
+  log('Stage 3 loaded automatically.');
+}
+
+// ── Start / Restart ────────────────────────────────────────────────────────
+function startCurrent() {
+  recallZone.innerHTML = '';
+  container.innerHTML = '';
+
+  if (_currentTab === 's1') {
+    // createRampPrediction auto-renders — just wire the callback
+    _pred = DrawPrediction.createRampPrediction(container);
+    _pred.onComplete(resp => {
+      _s1Response = resp;
+      document.getElementById('resp-s1').textContent = JSON.stringify(resp, null, 2);
+      updateChip('s1', 'done');
+      log(`<span class="ok">Stage 1 complete — choice: ${resp.choice}, confidence: ${resp.confidence}</span>`);
+      if (resp.choice === 'other') log(`  Other text: "${resp.other_text}"`);
+      log('<span class="info">→ Auto-advancing to Stage 2 in 1.5 s…</span>');
+      setTimeout(() => showTab('s2'), 1500);
+    });
+    updateChip('s1', 'active');
+    log('Stage 1 ready — make a prediction and lock it in.');
+
+  } else if (_currentTab === 's2') {
+    _loadS2();
+    log('Stage 2 refreshed.');
+
+  } else if (_currentTab === 's3') {
+    _loadS3();
+  }
+}
+
+// ── Reset ──────────────────────────────────────────────────────────────────
+function resetCurrent() {
+  recallZone.innerHTML = '';
+  container.innerHTML = '';
+
+  if (_currentTab === 's1') {
+    _s1Response = null;
+    document.getElementById('resp-s1').textContent = '—';
+    document.getElementById('resp-s3').textContent = '—';
+    updateChip('s1', ''); updateChip('s2', ''); updateChip('s3', '');
+  } else if (_currentTab === 's3') {
+    document.getElementById('resp-s3').textContent = '—';
+    updateChip('s3', '');
+  }
+  startCurrent();
+  log('Reset.');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function updateChip(id, state) {
+  const chip = document.getElementById(`chip-${id}`);
+  if (!chip) return;
+  chip.classList.remove('active', 'done');
+  if (state) chip.classList.add(state);
+}
+
+function log(msg) {
+  const el = document.getElementById('log');
+  el.innerHTML += `<div>${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+showTab('s1', true);
+startCurrent();
+log('Ready. Lock in prediction → auto-advances to Stage 2.');
+log('Click "Simulate experiment complete" → auto-loads Stage 3.');
+</script>
+
+</body>
+</html>

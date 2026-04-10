@@ -1,0 +1,15 @@
+[project]
+name = "physics-math-sims"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "manim>=0.20.1",
+    "pandas>=2.3.3",
+    "pip>=26.0.1",
+    "plotly>=6.6.0",
+    "setuptools==70.0.0",
+    "streamlit>=1.55.0",
+    "vpython>=7.6.5",
+]

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>draw-hook.js — Test Harness</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0c12; color: #eef2ff;
+    font-family: 'DM Sans', sans-serif;
+    padding: 24px; font-size: 13px;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+  }
+  h2 { color: #4df0b0; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; align-self: flex-start; }
+  .info { color: #a8b4d0; font-size: 12px; align-self: flex-start; }
+  .controls { display: flex; gap: 10px; align-self: flex-start; }
+  .btn {
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    padding: 8px 18px; border-radius: 7px;
+    border: 1.5px solid #2e3850; background: #161b28;
+    color: #eef2ff; cursor: pointer; transition: all 0.15s;
+  }
+  .btn:hover { border-color: #4df0b0; color: #4df0b0; }
+  .btn.go { background: #4df0b0; color: #050a0a; border-color: #4df0b0; font-weight: 700; }
+  canvas {
+    border: 1px solid #252d42; border-radius: 12px;
+    box-shadow: 0 4px 40px rgba(0,0,0,0.5);
+  }
+  #status {
+    font-family: 'DM Mono', monospace; font-size: 12px; color: #6b7a99;
+    align-self: flex-start;
+  }
+  #mcqBox {
+    display: none;
+    background: #111520; border: 1.5px solid #ffd166;
+    border-radius: 12px; padding: 20px 24px;
+    width: 560px;
+  }
+  .mcq-q { font-size: 14px; font-weight: 600; color: #eef2ff; margin-bottom: 14px; }
+  .mcq-choices { display: flex; flex-direction: column; gap: 8px; }
+  .mcq-btn {
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    padding: 9px 16px; border-radius: 8px; text-align: left;
+    border: 1.5px solid #2e3850; background: #0a0c12;
+    color: #a8b4d0; cursor: pointer; transition: all 0.15s;
+  }
+  .mcq-btn:hover { border-color: #ffd166; color: #ffd166; background: rgba(255,209,102,0.08); }
+  .mcq-btn.selected { border-color: #ffd166; color: #ffd166; background: rgba(255,209,102,0.1); font-weight: 600; }
+  #mcqResult { margin-top: 12px; font-size: 13px; color: #a8b4d0; display: none; line-height: 1.6; }
+  #continueBtn {
+    display: none; margin-top: 12px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+    padding: 9px 22px; border-radius: 8px;
+    background: #4df0b0; color: #050a0a; border: none; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h2>draw-hook.js — Visual Test</h2>
+<p class="info">Watch the animation, then answer the MCQ. Check the onComplete callback fires and MCQ appears.</p>
+
+<div class="controls">
+  <button class="btn go" id="btnStart" onclick="hookStart()">▶ Start</button>
+  <button class="btn" onclick="hookReset()">↺ Reset</button>
+</div>
+
+<canvas id="hookCanvas" width="560" height="480"></canvas>
+
+<div id="status">Status: idle</div>
+
+<!-- MCQ appears after animation completes -->
+<div id="mcqBox">
+  <div class="mcq-q">Which object hit the ground first?</div>
+  <div class="mcq-choices">
+    <button class="mcq-btn" onclick="selectChoice(this, 'iron')">🔵 Iron ball</button>
+    <button class="mcq-btn" onclick="selectChoice(this, 'feather')">🪶 Feather</button>
+    <button class="mcq-btn" onclick="selectChoice(this, 'same')">⚖ They hit at the same time</button>
+  </div>
+  <div id="mcqResult"></div>
+  <button id="continueBtn" onclick="simulateContinue()">Continue to Ramp →</button>
+</div>
+
+<script src="src/physics.js"></script>
+<script src="src/data-logger.js"></script>
+<script src="src/draw-hook.js"></script>
+<script>
+
+const canvas = document.getElementById('hookCanvas');
+let hook = null;
+let selectedChoice = null;
+
+function setStatus(msg, color = '#6b7a99') {
+  const el = document.getElementById('status');
+  el.textContent = 'Status: ' + msg;
+  el.style.color = color;
+}
+
+function hookStart() {
+  if (!hook) {
+    hook = DrawHook.create(canvas);
+    hook.onComplete(() => {
+      setStatus('Animation complete — onComplete() fired ✓', '#4df0b0');
+      document.getElementById('mcqBox').style.display = 'block';
+      document.getElementById('mcqBox').scrollIntoView({ behavior: 'smooth' });
+    });
+  }
+  setStatus('Countdown running…', '#ffd166');
+  document.getElementById('btnStart').textContent = '— Running';
+  document.getElementById('btnStart').disabled = true;
+  hook.start();
+}
+
+function hookReset() {
+  if (hook) hook.stop();
+  hook = null;
+  selectedChoice = null;
+  document.getElementById('btnStart').textContent = '▶ Start';
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('mcqBox').style.display = 'none';
+  document.getElementById('mcqResult').style.display = 'none';
+  document.getElementById('continueBtn').style.display = 'none';
+  document.querySelectorAll('.mcq-btn').forEach(b => b.classList.remove('selected'));
+  setStatus('idle');
+
+  // Clear canvas
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#0a0c12';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function selectChoice(btn, choice) {
+  if (selectedChoice) return; // already answered
+  selectedChoice = choice;
+  document.querySelectorAll('.mcq-btn').forEach(b => {
+    b.classList.remove('selected');
+    b.disabled = true;
+  });
+  btn.classList.add('selected');
+
+  // Log to DataLogger (simulating real session)
+  DataLogger.initSession('TEST_HOOK', 'TestStudent');
+  DataLogger.logResponse({
+    stage        : 0,
+    questionId   : 'hook_prediction',
+    questionText : 'Which object hit the ground first?',
+    mcqChoice    : choice,
+    mcqLabel     : btn.textContent.trim(),
+    explanation  : '',
+    correct      : null,
+  });
+
+  // Show result text
+  const resultEl = document.getElementById('mcqResult');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = choice === 'iron'
+    ? `<span style="color:#4df0b0">That's what most people expect.</span> The iron ball does fall faster here — but <em>why</em>? Let's investigate on the ramp.`
+    : choice === 'same'
+    ? `<span style="color:#ffd166">Interesting prediction.</span> Watch what happens next on the ramp.`
+    : `<span style="color:#ffd166">The feather? Let's test your hunch on the ramp.</span>`;
+
+  // Show continue button after short delay
+  setTimeout(() => {
+    document.getElementById('continueBtn').style.display = 'inline-block';
+  }, 800);
+
+  setStatus(`Response logged: choice="${choice}", correct=null ✓`, '#4df0b0');
+}
+
+function simulateContinue() {
+  const logged = DataLogger.getResponse('hook_prediction');
+  alert(
+    'onComplete + MCQ answer logged ✓\n\n' +
+    'Logged response:\n' +
+    JSON.stringify(logged, null, 2) +
+    '\n\nIn the real lab, StageManager.advance() would now unlock Stage 1.'
+  );
+}
+
+// Draw idle state on load
+(function() {
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0a0c12';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(77,240,176,0.4)';
+  ctx.font = '13px DM Sans, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Click ▶ Start to begin', canvas.width / 2, canvas.height / 2);
+})();
+
+</script>
+</body>
+</html>

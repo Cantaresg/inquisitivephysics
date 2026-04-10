@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DRAW-RAMP.JS v3 — Visual Test</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#070910;color:#eef2ff;font-family:'DM Sans',sans-serif;min-height:100vh;padding:20px;}
+h2{font-size:.8rem;color:#4df0b0;letter-spacing:.1em;font-family:'DM Mono',monospace;margin-bottom:14px;}
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.btn{font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;padding:7px 16px;border-radius:7px;
+  border:1.5px solid #252d42;background:#111520;color:#eef2ff;cursor:pointer;transition:all .15s;}
+.btn:hover{border-color:#4df0b0;color:#4df0b0;background:rgba(77,240,176,.1);}
+.btn.go{background:#4df0b0;color:#050a0a;border-color:#4df0b0;font-weight:700;}
+.btn.go:hover{background:#38d49a;}
+label{font-size:.78rem;color:#a8b4d0;}
+input[type=range]{accent-color:#4df0b0;cursor:pointer;width:130px;}
+select{background:#111520;color:#eef2ff;border:1.5px solid #252d42;border-radius:6px;padding:5px 9px;
+  font-family:'DM Mono',monospace;font-size:.75rem;cursor:pointer;}
+.val{font-family:'DM Mono',monospace;font-size:.75rem;color:#4df0b0;min-width:44px;}
+.sep{width:1px;height:24px;background:#252d42;}
+.canvas-wrap{border-radius:12px;border:1px solid #1e2840;overflow:hidden;background:#0a0c12;
+  box-shadow:0 6px 48px rgba(0,0,0,.6);}
+canvas{display:block;width:100%;}
+.status{margin-top:10px;font-size:.75rem;color:#6b7a99;font-family:'DM Mono',monospace;}
+.data-log{margin-top:12px;background:#0e1218;border:1px solid #1e2840;border-radius:8px;
+  padding:12px 14px;font-family:'DM Mono',monospace;font-size:.72rem;color:#a8b4d0;min-height:44px;}
+</style>
+</head>
+<body>
+
+<h2>DRAW-RAMP.JS v3 — VISUAL TEST</h2>
+
+<div class="controls">
+  <label>Length L</label>
+  <input type="range" id="sliderL" min="0.5" max="2.5" step="0.05" value="1.0" oninput="onL()">
+  <span class="val" id="lblL">1.00 m</span>
+  <div class="sep"></div>
+  <label>Heavy obj</label>
+  <select id="selObj" onchange="onObj()">
+    <option value="ironBall">Iron Ball</option>
+    <option value="stoneBall">Stone Ball</option>
+  </select>
+  <span style="font-size:.76rem;color:#4df0b0">θ = 30° (fixed)</span>
+</div>
+
+<div class="controls">
+  <button class="btn go" id="btnRelease" onclick="doRelease()">▶ Release</button>
+  <button class="btn" onclick="doReset()">↺ Reset</button>
+  <button class="btn" id="btnRecord" onclick="doRecord()" disabled>⊕ Record Run</button>
+  <button class="btn" onclick="doCSV()">↓ CSV</button>
+  <button class="btn" id="btnGraph" onclick="showGraph()" disabled>◳ Compare Graphs</button>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="c" width="960" height="480"></canvas>
+</div>
+
+<div class="status" id="status">Status: idle — set L and click Release. Stopwatch starts automatically.</div>
+<div class="data-log" id="log">No data yet. Run experiments and click ⊕ Record Run.</div>
+<div id="graphSection" style="display:none;margin-top:16px">
+  <div style="font-size:.7rem;color:#6b7a99;font-family:'DM Mono',monospace;margin-bottom:8px;letter-spacing:.06em">▸ COMPARE: which graph gives a straighter line through the origin?</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <div style="font-size:.68rem;color:#ffd166;font-family:'DM Mono',monospace;margin-bottom:5px">● t (s) vs L (m)</div>
+      <canvas id="gT" height="240" style="width:100%;border-radius:8px;border:1px solid #1e2840;background:#080b12;display:block"></canvas>
+    </div>
+    <div>
+      <div style="font-size:.68rem;color:#4df0b0;font-family:'DM Mono',monospace;margin-bottom:5px">● t² (s²) vs L (m)</div>
+      <canvas id="gT2" height="240" style="width:100%;border-radius:8px;border:1px solid #1e2840;background:#080b12;display:block"></canvas>
+    </div>
+  </div>
+  <div id="graphInsight" style="margin-top:10px;font-size:.75rem;color:#6b7a99;font-family:'DM Mono',monospace;line-height:1.7;padding:10px 14px;background:#0e1218;border-radius:6px;border:1px solid #1a2234"></div>
+</div>
+
+<!-- Physics engine -->
+<script>
+const Physics = (() => {
+  const G = 9.81;
+  function rk4(state, dt, accelFn) {
+    const{s,v}=state;
+    const k1v=accelFn(s,v),k1s=v;
+    const k2v=accelFn(s+.5*dt*k1s,v+.5*dt*k1v),k2s=v+.5*dt*k1v;
+    const k3v=accelFn(s+.5*dt*k2s,v+.5*dt*k2v),k3s=v+.5*dt*k2v;
+    const k4v=accelFn(s+dt*k3s,v+dt*k3v),k4s=v+dt*k3v;
+    return{s:s+dt/6*(k1s+2*k2s+2*k3s+k4s),v:v+dt/6*(k1v+2*k2v+2*k3v+k4v)};
+  }
+  function rampAccel(angleDeg,airOn,mu=0){
+    const th=angleDeg*Math.PI/180,a=G*Math.sin(th);
+    if(!airOn)return a;
+    return Math.max(0,a-mu*G*Math.cos(th));
+  }
+  function rampTime(L,angleDeg){return Math.sqrt(2*L/rampAccel(angleDeg,false));}
+  function dropAccel(obj,airOn){
+    const{mass,dragArea,Cd}=obj,rho=1.225;
+    return(s,v)=>{if(!airOn)return G;return Math.max(0,G-(0.5*rho*Cd*dragArea*v*v)/mass);};
+  }
+  function terminalVelocity(obj){
+    const{mass,dragArea,Cd}=obj,rho=1.225;
+    return Math.sqrt((2*mass*G)/(rho*Cd*dragArea));
+  }
+  const OBJECTS={
+    ironBall:{label:'Iron Ball',mass:1.0,dragArea:.003,Cd:.47,radius:14,color:'#8899bb',shine:'#c0d0ee',trackColor:'#c77dff'},
+    feather:{label:'Feather',mass:.001,dragArea:.008,Cd:1.2,radius:10,color:'#f5f0e8',shine:'#ffffff',trackColor:'#ffd166'},
+    stoneBall:{label:'Stone',mass:.5,dragArea:.002,Cd:.47,radius:12,color:'#8a8070',shine:'#b0a898',trackColor:'#c77dff'},
+    paperFlat:{label:'Flat Paper',mass:.005,dragArea:.06,Cd:1.17,radius:0,width:44,height:6,color:'#e8e4d8',shine:'#f8f4ec',trackColor:'#ffd166'},
+    paperCrumpled:{label:'Crumpled Paper',mass:.005,dragArea:.004,Cd:.47,radius:10,color:'#d8d0b8',shine:'#ece8d8',trackColor:'#ffd166'},
+    paperOnBook:{label:'Paper (on book)',mass:.205,dragArea:.062,Cd:1.17,radius:0,width:44,height:10,color:'#5060a0',shine:'#8090c8',trackColor:'#4df0b0'},
+  };
+  function gFromGradient(gradient,angleDeg){const th=angleDeg*Math.PI/180;return 2/(gradient*Math.sin(th));}
+  return{G,rk4,rampAccel,rampTime,dropAccel,terminalVelocity,gFromGradient,OBJECTS};
+})();
+</script>
+
+<!-- Ramp renderer v3 -->
+<script>
+const DrawRamp = (() => {
+  const FIXED_ANGLE_DEG = 30;
+  const RAMP_DEPTH      = 40;
+  const BACK_RISE       = 30;
+  const BACK_SHIFT_X    = -22;
+  const PAD_LEFT        = 52;
+  const PAD_RIGHT       = 56;
+  const PAD_TOP         = 76;
+  const PAD_BTM         = 64;
+
+  const LIGHT_OBJ = {
+    label:'Light Ball', radius:11,
+    color:'#b8940c', shine:'#ffd166', trackColor:'#ffd166',
+  };
+
+  function create(canvas) {
+    const ctx = canvas.getContext('2d');
+    let W = canvas.width, H = canvas.height;
+    let _L = 1.0, _heavyKey = 'ironBall';
+    let _running=false,_released=false,_rafId=null,_lastTs=null;
+    let _onBothLanded=null,_onReset=null;
+    let _heavy={s:0,v:0,landed:false,landT:null};
+    let _light={s:0,v:0,landed:false,landT:null};
+    let _simT=0,_swTime=0,_swRunning=false,_trail=[];
+    const TRAIL_MAX=16;
+
+    function _geo(){
+      const th=FIXED_ANGLE_DEG*Math.PI/180;
+      const avW=W-PAD_LEFT-PAD_RIGHT-Math.abs(BACK_SHIFT_X);
+      const avH=H-PAD_TOP-PAD_BTM;
+      const Lpx=Math.min(avW/Math.cos(th),avH/Math.sin(th))*0.93;
+      const tx=W-PAD_RIGHT, ty=PAD_TOP;
+      const bx=tx-Lpx*Math.cos(th), by=ty+Lpx*Math.sin(th);
+      const ux=(bx-tx)/Lpx, uy=(by-ty)/Lpx;
+      return{tx,ty,bx,by,Lpx,th,ux,uy};
+    }
+
+    function _rampPos(s,lane){
+      const{tx,ty,ux,uy,Lpx}=_geo();
+      const frac=s/_L;
+      const cx=tx+frac*Lpx*ux, cy=ty+frac*Lpx*uy;
+      return lane==='back'?{x:cx+BACK_SHIFT_X,y:cy-BACK_RISE}:{x:cx,y:cy};
+    }
+
+    function setParams({L,heavyKey}){if(L!==undefined)_L=L;if(heavyKey!==undefined)_heavyKey=heavyKey;}
+
+    function release(){
+      if(_released)return;
+      _released=true;_running=true;_swRunning=true;_lastTs=null;
+      if(!_rafId)_rafId=requestAnimationFrame(_loop);
+    }
+    function pause(){_running=false;_swRunning=false;}
+    function resume(){if(!_released)return;_running=true;_swRunning=true;if(!_rafId)_rafId=requestAnimationFrame(_loop);}
+    function reset(){
+      _running=false;_released=false;_swRunning=false;_swTime=0;
+      _heavy={s:0,v:0,landed:false,landT:null};
+      _light={s:0,v:0,landed:false,landT:null};
+      _simT=0;_trail=[];_lastTs=null;
+      if(_rafId){cancelAnimationFrame(_rafId);_rafId=null;}
+      _rafId=requestAnimationFrame(_drawStatic);
+      if(_onReset)_onReset();
+    }
+    function recordRun(){
+      if(!_heavy.landed||!_light.landed)return null;
+      const tH=_heavy.landT,tL=_light.landT;
+      return{L:_L,angleDeg:FIXED_ANGLE_DEG,tHeavy:+tH.toFixed(4),tLight:+tL.toFixed(4),t2Heavy:+(tH*tH).toFixed(5),t2Light:+(tL*tL).toFixed(5)};
+    }
+
+    function _loop(ts){
+      if(!_lastTs)_lastTs=ts;
+      const wdt=Math.min((ts-_lastTs)/1000,.033);_lastTs=ts;
+      if(_running){
+        const steps=16,dt=wdt/steps;
+        const a=Physics.rampAccel(FIXED_ANGLE_DEG,false,0);
+        for(let i=0;i<steps;i++){
+          if(!_heavy.landed){const ns=Physics.rk4({s:_heavy.s,v:_heavy.v},dt,()=>a);_heavy.s=ns.s;_heavy.v=ns.v;if(_heavy.s>=_L){_heavy.s=_L;_heavy.landed=true;_heavy.landT=_simT;}}
+          if(!_light.landed){const ns=Physics.rk4({s:_light.s,v:_light.v},dt,()=>a);_light.s=ns.s;_light.v=ns.v;if(_light.s>=_L){_light.s=_L;_light.landed=true;_light.landT=_simT;}}
+          _simT+=dt;
+        }
+        const lastS=_trail[_trail.length-1]?.sH||0;
+        if(!_trail.length||_heavy.s-lastS>_L/TRAIL_MAX){_trail.push({sH:_heavy.s,sL:_light.s});if(_trail.length>TRAIL_MAX)_trail.shift();}
+        if(_swRunning)_swTime+=wdt;
+        if(_heavy.landed&&_light.landed&&_running){_running=false;_swRunning=false;if(_onBothLanded)_onBothLanded({tHeavy:_heavy.landT,tLight:_light.landT});}
+      }
+      _draw(ts);
+      _rafId=requestAnimationFrame(_loop);
+    }
+    function _drawStatic(ts){_draw(ts||0);_rafId=null;}
+
+    function _draw(ts){
+      W=canvas.width;H=canvas.height;
+      ctx.clearRect(0,0,W,H);
+      _drawBg();_drawRamp();_drawGhostTrails();_drawObjects();_drawFinishLine();_drawStopwatch();_drawDataBar();
+      if(!_released)_drawHint();
+    }
+
+    function _drawBg(){
+      ctx.fillStyle='#0a0c12';ctx.fillRect(0,0,W,H);
+      ctx.strokeStyle='rgba(255,255,255,0.018)';ctx.lineWidth=1;
+      for(let x=0;x<W;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+      for(let y=0;y<H;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+      const{by}=_geo();
+      ctx.fillStyle='#0e1520';ctx.fillRect(0,by+2,W,H-by-2);
+      ctx.strokeStyle='#1a2436';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(0,by+2);ctx.lineTo(W,by+2);ctx.stroke();
+    }
+
+    function _drawRamp(){
+      const{tx,ty,bx,by,th}=_geo();
+      const ex=RAMP_DEPTH*Math.sin(th),ey=RAMP_DEPTH*Math.cos(th);
+      const bRx=BACK_SHIFT_X,bRy=-BACK_RISE;
+
+      // Underside face
+      ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(tx+ex,ty+ey);ctx.lineTo(bx+ex,by+ey);ctx.lineTo(bx,by);
+      ctx.closePath();ctx.fillStyle='#0b1018';ctx.fill();ctx.strokeStyle='#141e2e';ctx.lineWidth=1;ctx.stroke();
+
+      // Front lane
+      const fg=ctx.createLinearGradient(tx,ty,bx,by);
+      fg.addColorStop(0,'#1e2c50');fg.addColorStop(1,'#152038');
+      ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(bx,by);ctx.lineTo(bx+ex,by+ey);ctx.lineTo(tx+ex,ty+ey);
+      ctx.closePath();ctx.fillStyle=fg;ctx.fill();
+
+      // Back lane
+      const bg2=ctx.createLinearGradient(tx+bRx,ty+bRy,bx+bRx,by+bRy);
+      bg2.addColorStop(0,'#283862');bg2.addColorStop(1,'#1c2c4c');
+      ctx.beginPath();ctx.moveTo(tx+bRx,ty+bRy);ctx.lineTo(bx+bRx,by+bRy);ctx.lineTo(bx+bRx+ex,by+bRy+ey);ctx.lineTo(tx+bRx+ex,ty+bRy+ey);
+      ctx.closePath();ctx.fillStyle=bg2;ctx.fill();
+
+      // Shadow
+      ctx.save();ctx.globalAlpha=0.18;ctx.fillStyle='#000';
+      ctx.beginPath();ctx.moveTo(tx+bRx,ty+bRy+8);ctx.lineTo(bx+bRx,by+bRy+8);ctx.lineTo(bx+bRx+4,by+bRy+26);ctx.lineTo(tx+bRx+4,ty+bRy+26);
+      ctx.closePath();ctx.fill();ctx.restore();
+
+      // Side connector high end
+      ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(tx+bRx,ty+bRy);ctx.lineTo(tx+bRx+ex,ty+bRy+ey);ctx.lineTo(tx+ex,ty+ey);
+      ctx.closePath();ctx.fillStyle='#1c2c48';ctx.fill();
+      // Side connector low end
+      ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(bx+bRx,by+bRy);ctx.lineTo(bx+bRx+ex,by+bRy+ey);ctx.lineTo(bx+ex,by+ey);
+      ctx.closePath();ctx.fillStyle='#141e30';ctx.fill();
+
+      // Top edges
+      ctx.strokeStyle='#3a4e78';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(bx,by);ctx.stroke();
+      ctx.strokeStyle='#4a5e8c';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(tx+bRx,ty+bRy);ctx.lineTo(bx+bRx,by+bRy);ctx.stroke();
+
+      // Underside triangle
+      ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(tx,by);ctx.lineTo(tx,ty);
+      ctx.closePath();ctx.fillStyle='#0c1018';ctx.fill();ctx.strokeStyle='#141e2e';ctx.lineWidth=1;ctx.stroke();
+
+      // Support pillar
+      ctx.fillStyle='#141e30';ctx.beginPath();ctx.roundRect(tx-9,ty,18,by-ty,3);ctx.fill();
+      ctx.strokeStyle='#1e2c44';ctx.lineWidth=1;ctx.stroke();
+      ctx.fillStyle='#253450';ctx.beginPath();ctx.roundRect(tx-22,ty-14,44,14,4);ctx.fill();
+      ctx.strokeStyle='#2e3c60';ctx.lineWidth=1;ctx.stroke();
+
+      // L label — rotated along ramp. Add PI to flip so text reads left→right.
+      const midX=(tx+bx)/2,midY=(ty+by)/2;
+      const rampAngle = Math.atan2(by-ty,bx-tx);
+      ctx.save();ctx.translate(midX,midY);ctx.rotate(rampAngle + Math.PI);
+      ctx.fillStyle='rgba(77,240,176,0.6)';ctx.font='12px DM Mono,monospace';
+      ctx.textAlign='center';ctx.fillText('L = '+_L.toFixed(2)+' m',0,-12);ctx.restore();
+
+      // Lane labels — use textAlign right anchored to just inside right edge to prevent clipping
+      const hObj=Physics.OBJECTS[_heavyKey];
+      ctx.font='11px DM Mono,monospace';
+      ctx.fillStyle=(hObj.trackColor||'#c77dff')+'cc';
+      ctx.textAlign='right'; ctx.fillText(hObj.label, Math.min(tx+bRx+50, W-8), ty+bRy-26);
+      ctx.fillStyle=LIGHT_OBJ.trackColor+'cc';
+      ctx.fillText(LIGHT_OBJ.label, Math.min(tx+60, W-8), ty-26);
+    }
+
+    function _drawGhostTrails(){
+      if(_trail.length<2)return;
+      const hObj=Physics.OBJECTS[_heavyKey];
+      _trail.forEach((snap,i)=>{
+        const alpha=(i/_trail.length)*0.30;
+        ctx.save();ctx.globalAlpha=alpha;
+        const pH=_rampPos(snap.sH,'back'),pL=_rampPos(snap.sL,'front');
+        ctx.beginPath();ctx.arc(pH.x,pH.y,(hObj.radius||14)*0.55,0,Math.PI*2);ctx.fillStyle=hObj.trackColor||'#c77dff';ctx.fill();
+        ctx.beginPath();ctx.arc(pL.x,pL.y,LIGHT_OBJ.radius*0.55,0,Math.PI*2);ctx.fillStyle=LIGHT_OBJ.trackColor;ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    function _drawObjects(){
+      _drawBall(_light.s,LIGHT_OBJ,'front',_light.landed);
+      _drawBall(_heavy.s,Physics.OBJECTS[_heavyKey],'back',_heavy.landed);
+    }
+
+    function _drawBall(s,obj,lane,landed){
+      const pos=_rampPos(s,lane);
+      const r=obj.radius||12,col=obj.trackColor||'#4df0b0';
+      ctx.save();ctx.globalAlpha=0.2;
+      ctx.beginPath();ctx.ellipse(pos.x+4,pos.y+r*.6,r*1.15,r*.4,0,0,Math.PI*2);
+      ctx.fillStyle='#000';ctx.fill();ctx.restore();
+      const halo=ctx.createRadialGradient(pos.x,pos.y,0,pos.x,pos.y,r*2.4);
+      halo.addColorStop(0,col+'30');halo.addColorStop(1,'transparent');
+      ctx.beginPath();ctx.arc(pos.x,pos.y,r*2.4,0,Math.PI*2);ctx.fillStyle=halo;ctx.fill();
+      const sph=ctx.createRadialGradient(pos.x-r*.35,pos.y-r*.35,r*.04,pos.x,pos.y,r);
+      sph.addColorStop(0,obj.shine||'#fff');sph.addColorStop(.5,obj.color+'dd');sph.addColorStop(1,obj.color+'88');
+      ctx.beginPath();ctx.arc(pos.x,pos.y,r,0,Math.PI*2);ctx.fillStyle=sph;
+      ctx.shadowColor=col+'55';ctx.shadowBlur=landed?0:18;ctx.fill();
+      ctx.strokeStyle=col+'99';ctx.lineWidth=1.5;ctx.stroke();ctx.shadowBlur=0;
+      ctx.beginPath();ctx.arc(pos.x-r*.3,pos.y-r*.32,r*.22,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,255,255,0.34)';ctx.fill();
+      if(landed){ctx.font='600 10px DM Mono,monospace';ctx.textAlign='center';ctx.fillStyle=col;ctx.fillText('LANDED',pos.x,pos.y+r+16);}
+    }
+
+    function _drawFinishLine(){
+      const{bx,by,tx,ty,Lpx}=_geo();
+      // Ramp unit vector (high→low): (bx-tx, by-ty)/Lpx
+      // Perpendicular (rotated 90° CCW, pointing "above" the ramp surface): (-(by-ty), bx-tx)/Lpx
+      const px=(ty-by)/Lpx, py=(bx-tx)/Lpx;  // points upward-left, above ramp surface
+      ctx.save();ctx.strokeStyle='rgba(255,107,107,0.65)';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(bx + px*55, by + py*55);
+      ctx.lineTo(bx - px*10, by - py*10);
+      ctx.stroke();
+      ctx.setLineDash([]);ctx.fillStyle='rgba(255,107,107,0.65)';ctx.font='10px DM Mono,monospace';
+      ctx.textAlign='center';ctx.fillText('FINISH', bx + px*68, by + py*68);ctx.restore();
+    }
+
+    function _drawStopwatch(){
+      const s=Math.floor(_swTime),ms=Math.floor((_swTime-s)*1000);
+      const txt=String(s).padStart(2,'0')+'.'+String(ms).padStart(3,'0')+' s';
+      ctx.save();ctx.font='700 28px DM Mono,monospace';ctx.textAlign='left';
+      ctx.fillStyle=_swRunning?'#4df0b0':(_swTime>0?'#4df0b0':'#253040');
+      ctx.shadowColor=_swRunning?'#4df0b055':'transparent';ctx.shadowBlur=_swRunning?16:0;
+      ctx.fillText(txt,PAD_LEFT,46);ctx.shadowBlur=0;
+      ctx.font='10px DM Mono,monospace';ctx.fillStyle='#3a4a60';ctx.fillText('STOPWATCH',PAD_LEFT,60);ctx.restore();
+    }
+
+    function _drawDataBar(){
+      const tH=_heavy.landT!==null?_heavy.landT.toFixed(3)+' s':'—';
+      const tL=_light.landT!==null?_light.landT.toFixed(3)+' s':'—';
+      const t2H=_heavy.landT!==null?(_heavy.landT**2).toFixed(4)+' s²':'—';
+      const tTh=Physics.rampTime(_L,FIXED_ANGLE_DEG).toFixed(3)+' s';
+      const items=[
+        {label:'L',val:_L.toFixed(2)+' m',color:'#4df0b0'},
+        {label:'θ (fixed)',val:FIXED_ANGLE_DEG+'°',color:'#4df0b0'},
+        {label:'t theory',val:tTh,color:'#ffd166'},
+        {label:'t heavy',val:tH,color:'#c77dff'},
+        {label:'t light',val:tL,color:'#ffd166'},
+        {label:'t²',val:t2H,color:'#4df0b0'},
+      ];
+      ctx.save();ctx.font='10px DM Mono,monospace';
+      let x=PAD_LEFT;const y=H-14;
+      items.forEach(item=>{
+        ctx.fillStyle='#3a4a60';ctx.textAlign='left';ctx.fillText(item.label,x,y-16);
+        ctx.fillStyle=item.color;ctx.fillText(item.val,x,y);
+        x+=Math.max(ctx.measureText(item.val).width,ctx.measureText(item.label).width)+26;
+      });
+      ctx.restore();
+    }
+
+    function _drawHint(){
+      ctx.save();ctx.font='13px DM Sans,sans-serif';ctx.textAlign='center';
+      ctx.fillStyle='rgba(77,240,176,0.4)';
+      ctx.fillText('Click ▶ Release — stopwatch starts automatically',W/2,H-PAD_BTM-14);
+      ctx.restore();
+    }
+
+    function onBothLanded(fn){_onBothLanded=fn;}
+    function onReset(fn){_onReset=fn;}
+    function getState(){
+      return{released:_released,running:_running,sHeavy:_heavy.s,sLight:_light.s,
+        tHeavy:_heavy.landT,tLight:_light.landT,doneHeavy:_heavy.landed,doneLight:_light.landed,
+        simT:_simT,swTime:_swTime,L:_L,angleDeg:FIXED_ANGLE_DEG};
+    }
+
+    _rafId=requestAnimationFrame(_drawStatic);
+    return{setParams,release,pause,resume,reset,recordRun,onBothLanded,onReset,getState,FIXED_ANGLE_DEG};
+  }
+  return{create};
+})();
+</script>
+
+<script>
+const canvas = document.getElementById('c');
+const ramp   = DrawRamp.create(canvas);
+let dataRows = [];
+
+ramp.onBothLanded(({tHeavy, tLight}) => {
+  document.getElementById('status').textContent =
+    `Both landed — Heavy: ${tHeavy.toFixed(3)} s  |  Light: ${tLight.toFixed(3)} s  |  Click ⊕ Record Run to save.`;
+  document.getElementById('btnRecord').disabled = false;
+});
+
+ramp.onReset(() => {
+  document.getElementById('status').textContent = 'Status: idle — set L and click Release. Stopwatch starts automatically.';
+  document.getElementById('btnRecord').disabled = true;
+});
+
+function onL(){
+  const v = parseFloat(document.getElementById('sliderL').value);
+  document.getElementById('lblL').textContent = v.toFixed(2) + ' m';
+  ramp.setParams({ L: v });
+  ramp.reset();
+}
+
+function onObj(){
+  ramp.setParams({ heavyKey: document.getElementById('selObj').value });
+  ramp.reset();
+}
+
+function doRelease(){
+  ramp.release();
+  document.getElementById('status').textContent = 'Running… stopwatch counting.';
+}
+
+function doReset(){ ramp.reset(); }
+
+function doRecord(){
+  const row = ramp.recordRun();
+  if(!row){ alert('Run not complete yet.'); return; }
+  dataRows.push({ n: dataRows.length+1, ...row });
+  renderLog();
+  ramp.reset();
+  document.getElementById('btnRecord').disabled = true;
+}
+
+function renderLog(){
+  if(!dataRows.length){ document.getElementById('log').textContent='No data yet. Run experiments and click ⊕ Record Run.'; return; }
+  document.getElementById('btnGraph').disabled = dataRows.length < 2;
+  if(dataRows.length >= 2 && document.getElementById('graphSection').style.display !== 'none') showGraph();
+  const colW = ['40px','90px','110px','110px','110px','110px'];
+  const heads = ['#','L (m)','t heavy (s)','t light (s)','t² heavy (s²)','t² light (s²)'];
+  const cols  = ['#3a4a60','#3a4a60','#3a4a60','#3a4a60','#3a4a60','#3a4a60'];
+  let html = `<table style="border-collapse:collapse;width:100%;table-layout:fixed">
+    <colgroup>${colW.map(w=>`<col style="width:${w}">`).join('')}</colgroup>
+    <thead><tr>${heads.map((h,i)=>`<th style="text-align:left;padding:4px 6px;color:#6b7a99;font-weight:500;border-bottom:1px solid #1e2840">${h}</th>`).join('')}</tr></thead>
+    <tbody>`;
+  dataRows.forEach(r => {
+    html += `<tr>
+      <td style="padding:4px 6px;color:#4df0b0">${r.n}</td>
+      <td style="padding:4px 6px">${r.L.toFixed(2)}</td>
+      <td style="padding:4px 6px;color:#c77dff">${r.tHeavy.toFixed(4)}</td>
+      <td style="padding:4px 6px;color:#ffd166">${r.tLight.toFixed(4)}</td>
+      <td style="padding:4px 6px;color:#4df0b0">${r.t2Heavy.toFixed(5)}</td>
+      <td style="padding:4px 6px;color:#a8b4d0">${r.t2Light.toFixed(5)}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('log').innerHTML = html;
+}
+
+function showGraph(){
+  if(dataRows.length < 2){ alert('Need at least 2 data points first.'); return; }
+  document.getElementById('graphSection').style.display = 'block';
+  // Size canvases to their rendered width
+  requestAnimationFrame(() => {
+    ['gT','gT2'].forEach(id => {
+      const c = document.getElementById(id);
+      c.width = c.offsetWidth;
+    });
+    drawComparativeGraph('gT',  dataRows.map(r=>r.L), dataRows.map(r=>r.tHeavy),  't (s)', '#ffd166');
+    drawComparativeGraph('gT2', dataRows.map(r=>r.L), dataRows.map(r=>r.t2Heavy), 't² (s²)', '#4df0b0');
+    updateInsight();
+    document.getElementById('graphSection').scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+}
+
+function drawComparativeGraph(canvasId, xVals, yVals, yLabel, dotColor){
+  const gc = document.getElementById(canvasId);
+  const g  = gc.getContext('2d');
+  const GW = gc.width, GH = gc.height;
+  const pad = {l:50,r:20,t:20,b:40};
+  const pw = GW-pad.l-pad.r, ph = GH-pad.t-pad.b;
+  g.clearRect(0,0,GW,GH);
+  g.fillStyle='#080b12'; g.fillRect(0,0,GW,GH);
+
+  // Axis ranges — always go through origin
+  const maxX = Math.max(...xVals)*1.15;
+  const maxY = Math.max(...yVals)*1.15;
+  const tx = x => pad.l + (x/maxX)*pw;
+  const ty = y => pad.t + ph - (y/maxY)*ph;
+
+  // Grid
+  g.strokeStyle='rgba(255,255,255,0.04)'; g.lineWidth=1;
+  [0.25,0.5,0.75,1].forEach(f=>{
+    g.beginPath(); g.moveTo(pad.l, ty(maxY*f)); g.lineTo(pad.l+pw, ty(maxY*f)); g.stroke();
+    g.beginPath(); g.moveTo(tx(maxX*f), pad.t); g.lineTo(tx(maxX*f), pad.t+ph); g.stroke();
+  });
+
+  // Axes
+  g.strokeStyle='#2a3a58'; g.lineWidth=1.5;
+  g.beginPath(); g.moveTo(pad.l,pad.t); g.lineTo(pad.l,pad.t+ph); g.lineTo(pad.l+pw,pad.t+ph); g.stroke();
+
+  // Best-fit line through origin: slope = sum(xy)/sum(x²)
+  const sumXY = xVals.reduce((a,x,i)=>a+x*yVals[i],0);
+  const sumX2 = xVals.reduce((a,x)=>a+x*x,0);
+  const slope = sumXY/sumX2;
+  // Also compute R² vs line through origin
+  const yMean = yVals.reduce((a,b)=>a+b,0)/yVals.length;
+  const SStot = yVals.reduce((a,y)=>a+(y-yMean)**2,0);
+  const SSres = yVals.reduce((a,y,i)=>a+(y-slope*xVals[i])**2,0);
+  const r2 = 1 - SSres/SStot;
+
+  // Draw best-fit line
+  g.save(); g.strokeStyle=dotColor+'55'; g.lineWidth=1.5; g.setLineDash([5,4]);
+  g.beginPath(); g.moveTo(tx(0),ty(0)); g.lineTo(tx(maxX),ty(slope*maxX)); g.stroke();
+  g.restore();
+
+  // Data points
+  xVals.forEach((x,i)=>{
+    const px=tx(x), py=ty(yVals[i]);
+    g.beginPath(); g.arc(px,py,5,0,Math.PI*2);
+    g.fillStyle=dotColor; g.shadowColor=dotColor+'55'; g.shadowBlur=8; g.fill(); g.shadowBlur=0;
+    g.strokeStyle=dotColor+'88'; g.lineWidth=1; g.stroke();
+  });
+
+  // Axis tick labels
+  g.fillStyle='#4a5a78'; g.font='10px DM Mono,monospace'; g.textAlign='center';
+  [0.25,0.5,0.75,1].forEach(f=>{
+    g.fillText((maxX*f).toFixed(1), tx(maxX*f), pad.t+ph+14);
+    g.textAlign='right';
+    g.fillText((maxY*f).toFixed(2), pad.l-5, ty(maxY*f)+4);
+    g.textAlign='center';
+  });
+  g.textAlign='center';
+  g.fillStyle='#4a5a78'; g.font='10px DM Mono,monospace';
+  g.fillText('L (m)', pad.l+pw/2, GH-4);
+
+  // R² label
+  g.fillStyle=dotColor+'cc'; g.font='600 10px DM Mono,monospace'; g.textAlign='right';
+  g.fillText('R² = '+r2.toFixed(4), pad.l+pw, pad.t+14);
+
+  // Store r2 on canvas element for insight
+  gc._r2 = r2;
+  gc._slope = slope;
+  gc._yLabel = yLabel;
+}
+
+function updateInsight(){
+  const cT  = document.getElementById('gT');
+  const cT2 = document.getElementById('gT2');
+  if(!cT._r2 || !cT2._r2) return;
+  const el = document.getElementById('graphInsight');
+  const better = cT2._r2 >= cT._r2;
+  const diff = Math.abs(cT2._r2 - cT._r2);
+  // Estimate g from t² slope: t² = 2L/(g·sin30) → slope = 2/(g·0.5) = 4/g → g = 4/slope
+  const gEst = 4 / cT2._slope;
+  let msg = '';
+  if(diff < 0.002) {
+    msg = `Both graphs look similar with this data range (ΔR² = ${diff.toFixed(4)}). Try extending L to 2.5 m — the curvature of t vs L becomes more obvious.`;
+  } else if(better) {
+    msg = `t² vs L gives a higher R² (${cT2._r2.toFixed(4)} vs ${cT._r2.toFixed(4)}) — it is the more linear relationship.\nThis tells us t ∝ √L, not t ∝ L.`;
+  } else {
+    msg = `With this data set t vs L appears slightly more linear — try a wider L range (0.5 m to 2.5 m) to see the difference more clearly.`;
+  }
+  msg += `\n\nSlope of t² vs L = ${cT2._slope.toFixed(4)} s²/m  →  estimated g = ${gEst.toFixed(2)} m/s²  (theory: 9.81 m/s²)`;
+  el.style.color = better ? '#4df0b0' : '#ffd166';
+  el.textContent = msg;
+}
+
+function doCSV(){
+  if(!dataRows.length){ alert('No data yet.'); return; }
+  let csv = 'Run,L (m),Angle (deg),t heavy (s),t light (s),t2 heavy (s2),t2 light (s2)\n';
+  dataRows.forEach(r => csv += `${r.n},${r.L},${r.angleDeg},${r.tHeavy},${r.tLight},${r.t2Heavy},${r.t2Light}\n`);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = 'ramp_data.csv'; a.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>data-logger.js — Test Harness</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0c12; color: #eef2ff;
+    font-family: 'DM Mono', monospace, monospace;
+    padding: 32px; font-size: 13px; line-height: 1.7;
+  }
+  h2 { color: #4df0b0; margin: 24px 0 8px; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .pass { color: #4df0b0; } .fail { color: #ff6b6b; } .info { color: #a8b4d0; }
+  .warn { color: #ffd166; }
+  table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+  th { color: #6b7a99; padding: 3px 16px 3px 0; font-size: 11px; text-align: left; }
+  td { padding: 3px 16px 3px 0; vertical-align: top; }
+  .section { background: #111520; border: 1px solid #252d42; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .btn {
+    font-family: 'DM Mono', monospace; font-size: 12px; padding: 7px 16px;
+    border-radius: 7px; border: 1.5px solid #2e3850; background: #161b28;
+    color: #eef2ff; cursor: pointer; margin: 4px 4px 0 0; transition: all 0.15s;
+  }
+  .btn:hover { border-color: #4df0b0; color: #4df0b0; }
+  .btn.gold:hover { border-color: #ffd166; color: #ffd166; }
+  pre { background: #0a0c12; border: 1px solid #252d42; border-radius: 7px; padding: 12px; overflow-x: auto; font-size: 11px; color: #a8b4d0; margin-top: 8px; }
+  #sheetsNote { color: #ffd166; font-size: 12px; margin-top: 8px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h2 style="margin-top:0">data-logger.js — Test Harness</h2>
+
+<div class="section">
+  <h2>1 — Session Init + Log Responses</h2>
+  <div id="testResults"></div>
+</div>
+
+<div class="section">
+  <h2>2 — Question Registry</h2>
+  <div id="questionList"></div>
+</div>
+
+<div class="section">
+  <h2>3 — Score Calculation</h2>
+  <div id="scoreResult"></div>
+</div>
+
+<div class="section">
+  <h2>4 — Full Session JSON</h2>
+  <pre id="sessionJson"></pre>
+</div>
+
+<div class="section">
+  <h2>5 — CSV Export (manual test)</h2>
+  <p class="info" style="margin-bottom:10px">Click to download a CSV with the test session data.</p>
+  <button class="btn gold" onclick="DataLogger.downloadCSV()">↓ Download CSV</button>
+</div>
+
+<div class="section">
+  <h2>6 — Google Sheets Submit (manual test)</h2>
+  <p class="info" style="margin-bottom:10px">
+    Paste your deployed Apps Script URL below to test live submission.<br>
+    Leave blank to test the error handling path.
+  </p>
+  <input id="sheetsUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec"
+    style="width:100%; background:#0a0c12; border:1.5px solid #2e3850; border-radius:7px;
+           padding:7px 10px; color:#eef2ff; font-family:'DM Mono',monospace; font-size:12px;
+           outline:none; margin-bottom:8px;">
+  <button class="btn" onclick="testSheets()">▶ Submit to Sheets</button>
+  <div id="sheetsResult" style="margin-top:10px;"></div>
+  <div id="sheetsNote">
+    ℹ No URL needed to test locally — the submit will fail gracefully and show the error message.
+  </div>
+</div>
+
+<script src="src/data-logger.js"></script>
+<script>
+
+function assert(label, condition, detail = '') {
+  return `<div class="${condition ? 'pass' : 'fail'}">
+    ${condition ? '✓' : '✗'} ${label}
+    ${detail ? `<span class="info" style="margin-left:12px">${detail}</span>` : ''}
+  </div>`;
+}
+
+// ── TEST 1: SESSION + RESPONSES ─────────────────────────────────────────────
+const out = [];
+
+// Init session
+DataLogger.initSession('CLASS01', 'Student_A');
+const sess = DataLogger.getSession();
+out.push(assert('Session key set to CLASS01', sess.sessionKey === 'CLASS01'));
+out.push(assert('Student alias set', sess.studentAlias === 'Student_A'));
+out.push(assert('Starts with 0 responses', sess.responses.length === 0));
+
+// Log a hook prediction (no right/wrong)
+DataLogger.logResponse({
+  stage: 0, questionId: 'hook_prediction',
+  questionText: 'Which object hits the ground first?',
+  mcqChoice: 'iron', mcqLabel: 'Iron ball',
+  explanation: 'Obviously the heavy one', correct: null,
+});
+out.push(assert('Response logged', DataLogger.getSession().responses.length === 1));
+out.push(assert('Correct is null for hook', DataLogger.getResponse('hook_prediction').correct === null));
+
+// Log a ramp prediction (wrong answer)
+DataLogger.logResponse({
+  stage: 1, questionId: 'ramp_prediction',
+  questionText: 'Which reaches the bottom first?',
+  mcqChoice: 'heavy', mcqLabel: 'Heavy object',
+  explanation: '', correct: false,
+});
+
+// Log ramp discovery (correct)
+DataLogger.logResponse({
+  stage: 2, questionId: 'ramp_discovery',
+  questionText: 'What did you discover about mass?',
+  mcqChoice: 'mass_no_effect', mcqLabel: 'Mass has no effect',
+  explanation: 'Both balls always arrived at the same time no matter what I tried', correct: true,
+});
+
+// Log bridge question
+DataLogger.logResponse({
+  stage: 3, questionId: 'bridge_question',
+  questionText: 'Why do people think heavy objects fall faster?',
+  mcqChoice: 'air', mcqLabel: 'Air resistance',
+  explanation: 'I think air pushes back more on lighter objects', correct: true,
+});
+
+// Log drop demos
+DataLogger.logResponse({
+  stage: 4, questionId: 'drop_paper_flat',
+  questionText: 'Stone vs flat paper?', mcqChoice: 'stone', mcqLabel: 'Stone', correct: true,
+});
+DataLogger.logResponse({
+  stage: 4, questionId: 'drop_paper_crumpled',
+  questionText: 'Stone vs crumpled paper?', mcqChoice: 'stone', mcqLabel: 'Stone', correct: true,
+});
+DataLogger.logResponse({
+  stage: 4, questionId: 'drop_paper_book',
+  questionText: 'Stone vs paper on book?', mcqChoice: 'same', mcqLabel: 'Same time', correct: true,
+});
+
+out.push(assert('All 7 responses logged', DataLogger.getSession().responses.length === 7));
+
+// Test deduplication — re-logging same questionId should replace
+DataLogger.logResponse({
+  stage: 0, questionId: 'hook_prediction',
+  questionText: 'Which object hits the ground first?',
+  mcqChoice: 'feather', mcqLabel: 'Feather',
+  correct: null,
+});
+out.push(assert(
+  'Duplicate questionId replaces, no extra row',
+  DataLogger.getSession().responses.length === 7,
+  `hook now = ${DataLogger.getResponse('hook_prediction').mcqChoice}`
+));
+
+document.getElementById('testResults').innerHTML = out.join('');
+
+// ── TEST 2: QUESTION REGISTRY ───────────────────────────────────────────────
+const qs = DataLogger.QUESTIONS;
+const qKeys = Object.keys(qs);
+let qHtml = `<table><tr><th>ID</th><th>Stage</th><th>Choices</th><th>Correct key</th></tr>`;
+qKeys.forEach(k => {
+  const q = qs[k];
+  qHtml += `<tr>
+    <td class="pass">${q.id}</td>
+    <td>${q.stage}</td>
+    <td class="info">${q.choices.map(c=>c.key).join(' | ')}</td>
+    <td class="${q.correctKey ? 'pass' : 'warn'}">${q.correctKey || 'null (no right answer)'}</td>
+  </tr>`;
+});
+qHtml += '</table>';
+document.getElementById('questionList').innerHTML = qHtml;
+
+// ── TEST 3: SCORE ───────────────────────────────────────────────────────────
+const score = DataLogger.getScore();
+document.getElementById('scoreResult').innerHTML = `
+  <div class="pass">Score: ${score.correct}/${score.total} (${score.pct}%)</div>
+  <div class="info" style="margin-top:4px">
+    Note: hook_prediction excluded (correct=null). ramp_prediction was wrong (bias).
+    All others correct. Expected 5/6 = 83%.
+  </div>
+  <div class="${score.pct === 83 ? 'pass' : 'fail'}" style="margin-top:4px">
+    ${score.pct === 83 ? '✓' : '✗'} Score matches expected 83%
+  </div>
+`;
+
+// ── TEST 4: JSON DUMP ───────────────────────────────────────────────────────
+document.getElementById('sessionJson').textContent =
+  JSON.stringify(DataLogger.getSession(), null, 2);
+
+// ── TEST 6: SHEETS SUBMIT ───────────────────────────────────────────────────
+async function testSheets() {
+  const url = document.getElementById('sheetsUrl').value.trim();
+  if (url) DataLogger.setSheetsUrl(url);
+  const el = document.getElementById('sheetsResult');
+  el.innerHTML = '<span class="info">Submitting…</span>';
+  const result = await DataLogger.submitToSheets();
+  if (result.ok) {
+    el.innerHTML = `<span class="pass">✓ Submitted ${result.submitted} rows successfully.</span>`;
+  } else if (result.error) {
+    el.innerHTML = `<span class="warn">⚠ ${result.error}</span>`;
+  } else {
+    el.innerHTML = `<span class="warn">⚠ ${result.submitted} ok, ${result.errors} errors. Check console.</span>`;
+  }
+}
+
+</script>
+</body>
+</html>

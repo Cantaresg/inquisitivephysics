@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>History Card — Test Harness</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:        #0a0c12;
+  --surface:   #111520;
+  --surface2:  #161b28;
+  --border:    #252d42;
+  --border2:   #2e3850;
+  --accent:    #4df0b0;
+  --accent-dim:rgba(77,240,176,0.12);
+  --gold:      #ffd166;
+  --gold-dim:  rgba(255,209,102,0.12);
+  --purple:    #c77dff;
+  --red:       #ff6b6b;
+  --text:      #eef2ff;
+  --text-mid:  #a8b4d0;
+  --text-dim:  #6b7a99;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex; align-items: center;
+  padding: 0 24px; height: 48px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  gap: 12px; flex-shrink: 0;
+  position: sticky; top: 0; z-index: 10;
+}
+.logo { font-size: .95rem; font-weight: 700; color: var(--accent); }
+.logo em { color: var(--text); font-style: normal; }
+.tag {
+  font-size: .7rem; font-family: 'DM Mono', monospace;
+  color: var(--text-dim); border: 1px solid var(--border2);
+  border-radius: 12px; padding: 2px 10px;
+}
+
+/* ── LAYOUT ── */
+.app { display: flex; flex: 1; min-height: 0; }
+
+/* History column — scrollable */
+.hist-col {
+  flex: 1; overflow-y: auto;
+  background: var(--bg);
+}
+
+/* Side panel */
+.side-panel {
+  width: 260px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+}
+.ps { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); }
+.ps:last-child { border-bottom: none; }
+.ps-title {
+  font-size: .62rem; font-family: 'DM Mono', monospace;
+  color: var(--text-dim); letter-spacing: .1em;
+  text-transform: uppercase; margin-bottom: 12px; font-weight: 500;
+}
+
+/* Buttons */
+.btn {
+  font-family: 'DM Sans', sans-serif; font-size: .8rem; font-weight: 600;
+  padding: 8px 16px; border-radius: 8px;
+  border: 1.5px solid var(--border2); background: var(--surface2);
+  color: var(--text); cursor: pointer; transition: all .15s;
+  width: 100%; margin-bottom: 7px; text-align: left;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.btn.go { background: var(--accent); color: #050a0a; border-color: var(--accent); font-weight: 700; }
+.btn.go:hover { background: #38d49a; }
+.btn.danger:hover { border-color: var(--red); color: var(--red); background: rgba(255,107,107,.1); }
+
+/* Log */
+.log {
+  font-family: 'DM Mono', monospace; font-size: .68rem;
+  color: var(--text-dim); line-height: 1.9;
+  max-height: 220px; overflow-y: auto;
+}
+.log .ok   { color: var(--accent); }
+.log .info { color: var(--gold); }
+.log .warn { color: var(--red); }
+
+/* Status chips */
+.chip {
+  display: inline-block;
+  font-family: 'DM Mono', monospace; font-size: .62rem;
+  padding: 2px 9px; border-radius: 10px;
+  border: 1px solid var(--border2);
+  color: var(--text-dim); margin-bottom: 5px;
+  transition: all .3s;
+}
+.chip.active { border-color: var(--gold);   color: var(--gold); }
+.chip.done   { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Physics<em>Sims</em></div>
+  <div class="tag">draw-history.js · TEST HARNESS</div>
+</header>
+
+<div class="app">
+
+  <!-- History content scrolls here -->
+  <div class="hist-col" id="histContainer"></div>
+
+  <!-- Side panel -->
+  <div class="side-panel">
+
+    <div class="ps">
+      <div class="ps-title">Controls</div>
+      <button class="btn go" onclick="doStart()">▶ Start History Card</button>
+      <button class="btn danger" onclick="doReset()">↺ Reset</button>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Section Status</div>
+      <div id="sectionChips">
+        <div class="chip" id="chip-0">Section 1 — Myth</div>
+        <div class="chip" id="chip-1">Section 2 — Reality</div>
+        <div class="chip" id="chip-2">Section 3 — Insight</div>
+        <div class="chip" id="chip-done">Complete</div>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Reflection (on complete)</div>
+      <div id="reflectionOut" style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--text-dim);line-height:1.6;">
+        Shown here after student submits.
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Console</div>
+      <div class="log" id="log"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- draw-history.js inlined for file:// compatibility -->
+<script>
+/**
+ * draw-history.js — Stage 5 History Card
+ * Socratic reveal of Galileo's real experimental method.
+ * NO canvas — injects styled HTML into a container element.
+ *
+ * Pedagogical arc (three gated sections):
+ *   Section 0 — The Story Everyone Knows   (Tower of Pisa myth → prompt)
+ *   Section 1 — What He Actually Did        (inclined plane reality → prompt)
+ *   Section 2 — What This Means             (connect to student's own experiment → reflection)
+ *
+ * Usage:
+ *   const hist = DrawHistory.create(containerEl);
+ *   hist.onComplete(() => { ...advance or show certificate... });
+ *   hist.start();
+ *
+ * The host page must load DM Sans + DM Mono from Google Fonts.
+ * CSS variables from the lab's :root are used automatically if present;
+ * fallback values are declared inline so the module works standalone.
+ */
+
+const DrawHistory = (() => {
+
+  // ── CONTENT ───────────────────────────────────────────────────────────────
+  const SECTIONS = [
+    {
+      tag     : 'THE MYTH',
+      tagColor: 'var(--gold, #ffd166)',
+      heading : 'The Story Everyone Knows',
+      prose   : `
+        <p>
+          Around 1590, so the story goes, Galileo Galilei climbed to the top of the
+          Leaning Tower of Pisa, held out a cannonball and a musket ball, and let them
+          drop simultaneously. The heavy ball and the light ball — according to Aristotle —
+          should land at very different times. The crowd below watched. Both hit the ground
+          together. Aristotle was wrong. The end.
+        </p>
+        <p>
+          It is a great story. Dramatic setting, clear result, heroic scientist proving
+          the establishment wrong in front of witnesses.
+        </p>
+      `,
+      figure  : 'tower',
+      prompt  : 'Think back to the very first animation you watched — the feather and the iron ball. Did they land at the same time?',
+      hint    : 'If the Tower of Pisa story is the whole truth, what would you expect to see when you drop two objects of different masses in air?',
+      cta     : "I've thought about it →",
+    },
+    {
+      tag     : 'THE REALITY',
+      tagColor: 'var(--accent, #4df0b0)',
+      heading : 'What Galileo Actually Did',
+      prose   : `
+        <p>
+          There is no reliable historical record of the Tower drop ever happening.
+          The story first appeared decades after Galileo's death, written by his
+          student Vincenzo Viviani — who was known to embellish.
+        </p>
+        <p>
+          What Galileo <em>did</em> do, documented in his own notebooks, was far more
+          careful — and far more powerful. He built a long, smooth ramp. He varied
+          the length. He timed the rolls using a water clock. He recorded the numbers.
+          He noticed that the time depended on the length of the ramp, not on the
+          mass of the ball.
+        </p>
+        <p>
+          By controlling one variable at a time, he could separate the effect of
+          gravity from the effect of air resistance — something a single dramatic
+          drop from a tower could never cleanly do.
+        </p>
+      `,
+      figure  : 'ramp',
+      prompt  : 'In your ramp experiment, you changed one thing at a time. What was the one variable you changed — and what did you hold fixed?',
+      hint    : 'Galileo fixed the angle, varied the length, and timed the roll. Does that match what you did in Stage 2?',
+      cta     : 'Yes, I see the connection →',
+    },
+    {
+      tag     : 'THE INSIGHT',
+      tagColor: 'var(--purple, #c77dff)',
+      heading : 'What This Means',
+      prose   : `
+        <p>
+          The Tower story is satisfying because it is simple: one drop, one answer.
+          But simplicity can mislead. In air, a feather and a ball <em>don't</em> land
+          together — you saw that yourself. A single dramatic demonstration would
+          have proved nothing reliable.
+        </p>
+        <p>
+          Galileo's genius was not the spectacle. It was the method: isolate one
+          variable, repeat the measurement, look for a pattern in the numbers.
+          That is still how physics — and all of science — works today.
+        </p>
+        <p>
+          When you placed the paper on the book and they fell together, you weren't
+          just watching a trick. You were isolating air resistance the same way
+          Galileo isolated mass on his ramp. The method is 400 years old.
+          You just used it.
+        </p>
+      `,
+      figure  : 'method',
+      prompt  : 'If someone told you "heavier objects fall faster" — what experiment would you design to test that claim properly?',
+      hint    : 'Think about what you would need to control, what you would change, and how you would know if your result was reliable.',
+      cta     : 'Complete the Lab ✓',
+    },
+  ];
+
+  // ── INLINE SVG FIGURES ────────────────────────────────────────────────────
+  const FIGURES = {
+    tower: `
+      <svg viewBox="0 0 220 180" xmlns="http://www.w3.org/2000/svg" class="hist-fig">
+        <line x1="20" y1="165" x2="200" y2="165" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+        <g transform="rotate(-4, 110, 165)">
+          <rect x="78" y="40" width="44" height="125" rx="3"
+                fill="#1a2035" stroke="#2e3a58" stroke-width="1.5"/>
+          <line x1="78" y1="70"  x2="122" y2="70"  stroke="#2e3a58" stroke-width="1"/>
+          <line x1="78" y1="100" x2="122" y2="100" stroke="#2e3a58" stroke-width="1"/>
+          <line x1="78" y1="130" x2="122" y2="130" stroke="#2e3a58" stroke-width="1"/>
+          <rect x="72" y="32" width="56" height="12" rx="2"
+                fill="#243050" stroke="#3a4e78" stroke-width="1"/>
+          <ellipse cx="100" cy="72" rx="8" ry="6" fill="none" stroke="#2e3a58" stroke-width="1"/>
+          <ellipse cx="100" cy="102" rx="8" ry="6" fill="none" stroke="#2e3a58" stroke-width="1"/>
+        </g>
+        <circle cx="96" cy="80" r="7" fill="#8899bb" stroke="#c77dff" stroke-width="1.2"/>
+        <circle cx="118" cy="80" r="4" fill="#c8c4b8" stroke="#ffd16699" stroke-width="1"/>
+        <line x1="96" y1="88" x2="96" y2="155" stroke="#c77dff44" stroke-width="1.5" stroke-dasharray="3,5"/>
+        <line x1="118" y1="85" x2="118" y2="155" stroke="#ffd16644" stroke-width="1.5" stroke-dasharray="3,5"/>
+        <text x="148" y="110" font-family="DM Sans, sans-serif" font-size="32"
+              font-weight="700" fill="rgba(255,209,102,0.25)" text-anchor="middle">?</text>
+        <text x="96"  y="172" font-family="DM Mono, monospace" font-size="9"
+              fill="#c77dffaa" text-anchor="middle">heavy</text>
+        <text x="118" y="172" font-family="DM Mono, monospace" font-size="9"
+              fill="#ffd166aa" text-anchor="middle">light</text>
+      </svg>`,
+    ramp: `
+      <svg viewBox="0 0 220 180" xmlns="http://www.w3.org/2000/svg" class="hist-fig">
+        <line x1="10" y1="158" x2="210" y2="158" stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
+        <polygon points="30,158 190,158 190,60"
+                 fill="#18243c" stroke="#3a4e78" stroke-width="1.5"/>
+        <line x1="30" y1="158" x2="190" y2="60" stroke="#4a5e8c" stroke-width="2"/>
+        <line x1="38" y1="158" x2="184" y2="67" stroke="#2e3e64" stroke-width="3"/>
+        <circle cx="95" cy="117" r="10" fill="#8899bb" stroke="#c77dff" stroke-width="1.5"/>
+        <circle cx="89" cy="112" r="3" fill="rgba(255,255,255,0.25)"/>
+        <line x1="105" y1="111" x2="145" y2="89"
+              stroke="#4df0b066" stroke-width="1.5" stroke-dasharray="4,4"/>
+        <polygon points="145,89 136,90 140,98" fill="#4df0b066"/>
+        <path d="M 190,158 A 30,30 0 0,0 172,131"
+              fill="none" stroke="rgba(77,240,176,0.4)" stroke-width="1.2"/>
+        <text x="175" y="150" font-family="DM Mono, monospace" font-size="10"
+              fill="rgba(77,240,176,0.6)">30°</text>
+        <text x="95" y="100" font-family="DM Mono, monospace" font-size="10"
+              fill="rgba(77,240,176,0.55)" text-anchor="middle"
+              transform="rotate(-27, 95, 100)">L</text>
+        <rect x="14" y="90" width="18" height="28" rx="3"
+              fill="#1a2035" stroke="#253450" stroke-width="1"/>
+        <line x1="23" y1="118" x2="23" y2="128" stroke="#4df0b066" stroke-width="1.5"/>
+        <text x="23" y="138" font-family="DM Mono, monospace" font-size="8"
+              fill="#4df0b066" text-anchor="middle">clock</text>
+      </svg>`,
+    method: `
+      <svg viewBox="0 0 220 180" xmlns="http://www.w3.org/2000/svg" class="hist-fig">
+        <circle cx="110" cy="90" r="72" fill="none" stroke="#1e2840" stroke-width="1"/>
+        <circle cx="110" cy="22" r="22" fill="#1a2035" stroke="#3a4e78" stroke-width="1.5"/>
+        <text x="110" y="18" font-family="DM Sans, sans-serif" font-size="8" font-weight="600"
+              fill="#a8b4d0" text-anchor="middle">ISOLATE</text>
+        <text x="110" y="29" font-family="DM Sans, sans-serif" font-size="8" font-weight="600"
+              fill="#a8b4d0" text-anchor="middle">VARIABLE</text>
+        <circle cx="185" cy="128" r="22" fill="#1a2035" stroke="#3a4e78" stroke-width="1.5"/>
+        <text x="185" y="124" font-family="DM Sans, sans-serif" font-size="8" font-weight="600"
+              fill="#a8b4d0" text-anchor="middle">MEASURE</text>
+        <text x="185" y="135" font-family="DM Sans, sans-serif" font-size="8" font-weight="600"
+              fill="#a8b4d0" text-anchor="middle">REPEAT</text>
+        <circle cx="35" cy="128" r="22" fill="#1a2035" stroke="#3a4e78" stroke-width="1.5"/>
+        <text x="35" y="124" font-family="DM Sans, sans-serif" font-size="8" font-weight="600"
+              fill="#a8b4d0" text-anchor="middle">FIND THE</text>
+        <text x="35" y="135" font-family="DM Sans, sans-serif" font-size="8" font-weight="600"
+              fill="#a8b4d0" text-anchor="middle">PATTERN</text>
+        <path d="M 126,38 Q 168,60 170,108"
+              fill="none" stroke="rgba(77,240,176,0.4)" stroke-width="1.5"
+              marker-end="url(#ah)"/>
+        <path d="M 163,142 Q 110,175 57,142"
+              fill="none" stroke="rgba(77,240,176,0.4)" stroke-width="1.5"
+              marker-end="url(#ah)"/>
+        <path d="M 50,108 Q 52,60 94,38"
+              fill="none" stroke="rgba(77,240,176,0.4)" stroke-width="1.5"
+              marker-end="url(#ah)"/>
+        <defs>
+          <marker id="ah" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="rgba(77,240,176,0.5)"/>
+          </marker>
+        </defs>
+        <text x="110" y="86" font-family="DM Sans, sans-serif" font-size="11" font-weight="700"
+              fill="rgba(199,125,255,0.7)" text-anchor="middle">Scientific</text>
+        <text x="110" y="100" font-family="DM Sans, sans-serif" font-size="11" font-weight="700"
+              fill="rgba(199,125,255,0.7)" text-anchor="middle">Method</text>
+      </svg>`,
+  };
+
+  // ── STYLES ────────────────────────────────────────────────────────────────
+  const CSS = `
+    .hist-wrap {
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text, #eef2ff);
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px 20px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .hist-progress {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 28px;
+    }
+    .hist-pip {
+      width: 28px; height: 4px; border-radius: 2px;
+      background: var(--border, #252d42); transition: background 0.4s;
+    }
+    .hist-pip.done  { background: var(--accent, #4df0b0); }
+    .hist-pip.cur   { background: var(--gold,   #ffd166); }
+    .hist-prog-lbl {
+      margin-left: auto; font-family: 'DM Mono', monospace;
+      font-size: 0.62rem; color: var(--text-dim, #6b7a99); letter-spacing: 0.08em;
+    }
+    .hist-section {
+      background: var(--surface, #111520);
+      border: 1px solid var(--border, #252d42);
+      border-radius: 14px; padding: 28px 28px 24px; margin-bottom: 20px;
+      opacity: 0; transform: translateY(18px);
+      pointer-events: none; visibility: hidden;
+      transition: opacity 0.5s ease, transform 0.5s ease, visibility 0s 0.5s;
+    }
+    .hist-section.visible {
+      opacity: 1; transform: translateY(0);
+      pointer-events: auto; visibility: visible;
+      transition: opacity 0.5s ease, transform 0.5s ease, visibility 0s 0s;
+    }
+    .hist-tag {
+      font-family: 'DM Mono', monospace; font-size: 0.62rem;
+      letter-spacing: 0.12em; font-weight: 500; margin-bottom: 8px;
+    }
+    .hist-heading {
+      font-size: 1.18rem; font-weight: 700;
+      color: var(--text, #eef2ff); margin-bottom: 16px; line-height: 1.3;
+    }
+    .hist-fig-wrap { float: right; margin: 0 0 12px 20px; width: 140px; }
+    .hist-fig { width: 100%; height: auto; display: block; }
+    @media (max-width: 480px) {
+      .hist-fig-wrap { float: none; margin: 0 0 16px 0; width: 100%; max-width: 200px; }
+    }
+    .hist-prose {
+      font-size: 0.875rem; line-height: 1.75;
+      color: var(--text-mid, #a8b4d0); margin-bottom: 20px;
+    }
+    .hist-prose p { margin-bottom: 0.85em; }
+    .hist-prose p:last-child { margin-bottom: 0; }
+    .hist-prose em { color: var(--text, #eef2ff); font-style: normal; font-weight: 600; }
+    .hist-prose strong { color: var(--accent, #4df0b0); }
+    .hist-clear { clear: both; }
+    .hist-prompt-box {
+      background: var(--bg, #0a0c12); border: 1.5px solid var(--border2, #2e3850);
+      border-radius: 10px; padding: 16px 18px; margin-top: 4px;
+    }
+    .hist-prompt-label {
+      font-family: 'DM Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.1em; color: var(--text-dim, #6b7a99);
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    .hist-prompt-q {
+      font-size: 0.9rem; font-weight: 600;
+      color: var(--text, #eef2ff); line-height: 1.5; margin-bottom: 10px;
+    }
+    .hist-prompt-hint {
+      font-size: 0.78rem; color: var(--text-dim, #6b7a99);
+      line-height: 1.55; margin-bottom: 14px;
+      padding-left: 10px; border-left: 2px solid var(--border2, #2e3850);
+    }
+    .hist-textarea {
+      width: 100%; background: var(--surface2, #161b28);
+      border: 1.5px solid var(--border2, #2e3850); border-radius: 8px;
+      padding: 10px 12px; font-family: 'DM Mono', monospace;
+      font-size: 0.78rem; color: var(--text, #eef2ff);
+      resize: vertical; min-height: 72px; outline: none;
+      box-sizing: border-box; margin-bottom: 12px; transition: border-color 0.15s;
+    }
+    .hist-textarea:focus { border-color: var(--purple, #c77dff); }
+    .hist-textarea::placeholder { color: var(--text-dim, #6b7a99); }
+    .hist-cta {
+      font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700;
+      padding: 9px 20px; border-radius: 8px;
+      border: 1.5px solid var(--accent, #4df0b0);
+      background: var(--accent, #4df0b0); color: #050a0a;
+      cursor: pointer; transition: background 0.15s, transform 0.1s; display: inline-block;
+    }
+    .hist-cta:hover  { background: #38d49a; }
+    .hist-cta:active { transform: scale(0.97); }
+    .hist-cta:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+    .hist-complete {
+      text-align: center; padding: 28px 20px;
+      background: rgba(77,240,176,0.07);
+      border: 1px solid rgba(77,240,176,0.2);
+      border-radius: 14px; display: none;
+    }
+    .hist-complete.visible { display: block; }
+    .hist-complete-icon { font-size: 2.2rem; margin-bottom: 10px; }
+    .hist-complete-title {
+      font-size: 1.1rem; font-weight: 700;
+      color: var(--accent, #4df0b0); margin-bottom: 6px;
+    }
+    .hist-complete-sub {
+      font-size: 0.82rem; color: var(--text-dim, #6b7a99); line-height: 1.6;
+    }
+    .hist-source {
+      font-family: 'DM Mono', monospace; font-size: 0.62rem;
+      color: var(--text-dim, #6b7a99); margin-top: 6px; line-height: 1.6;
+    }
+    .hist-source a { color: var(--text-dim, #6b7a99); text-decoration: underline; }
+  `;
+
+  // ── FACTORY ───────────────────────────────────────────────────────────────
+  function create(containerEl) {
+    let _onComplete = null;
+    let _currentSection = -1;
+    let _sectionEls = [];
+    let _complete = false;
+
+    function _injectStyles() {
+      if (document.getElementById('hist-styles')) return;
+      const style = document.createElement('style');
+      style.id = 'hist-styles';
+      style.textContent = CSS;
+      document.head.appendChild(style);
+    }
+
+    function _buildDOM() {
+      containerEl.innerHTML = '';
+      const wrap = document.createElement('div');
+      wrap.className = 'hist-wrap';
+
+      const prog = document.createElement('div');
+      prog.className = 'hist-progress';
+      prog.id = 'hist-progress';
+      SECTIONS.forEach((_, i) => {
+        const pip = document.createElement('div');
+        pip.className = 'hist-pip';
+        pip.id = `hist-pip-${i}`;
+        prog.appendChild(pip);
+      });
+      const lbl = document.createElement('div');
+      lbl.className = 'hist-prog-lbl';
+      lbl.textContent = 'STAGE 5 OF 5';
+      prog.appendChild(lbl);
+      wrap.appendChild(prog);
+
+      _sectionEls = [];
+      SECTIONS.forEach((sec, i) => {
+        const card = _buildSectionCard(sec, i);
+        wrap.appendChild(card);
+        _sectionEls.push(card);
+      });
+
+      const banner = document.createElement('div');
+      banner.className = 'hist-complete';
+      banner.id = 'hist-complete';
+      banner.innerHTML = `
+        <div class="hist-complete-icon">🔬</div>
+        <div class="hist-complete-title">Lab Complete</div>
+        <div class="hist-complete-sub">
+          You observed, you measured, you found the pattern.<br>
+          Four hundred years later — the method still works.
+        </div>
+      `;
+      wrap.appendChild(banner);
+
+      const src = document.createElement('div');
+      src.className = 'hist-source';
+      src.innerHTML = `
+        Historical note: The Tower of Pisa story originates from Viviani's
+        <em>Life of Galileo</em> (c. 1654), written ~12 years after Galileo's death.
+        Galileo's inclined plane experiments are documented in
+        <em>Discourses and Mathematical Demonstrations Relating to Two New Sciences</em> (1638).
+      `;
+      wrap.appendChild(src);
+      containerEl.appendChild(wrap);
+    }
+
+    function _buildSectionCard(sec, index) {
+      const card = document.createElement('div');
+      card.className = 'hist-section';
+      card.id = `hist-section-${index}`;
+
+      const tag = document.createElement('div');
+      tag.className = 'hist-tag';
+      tag.style.color = sec.tagColor;
+      tag.textContent = `▸ ${sec.tag}`;
+      card.appendChild(tag);
+
+      const h = document.createElement('div');
+      h.className = 'hist-heading';
+      h.textContent = sec.heading;
+      card.appendChild(h);
+
+      if (FIGURES[sec.figure]) {
+        const figWrap = document.createElement('div');
+        figWrap.className = 'hist-fig-wrap';
+        figWrap.innerHTML = FIGURES[sec.figure];
+        card.appendChild(figWrap);
+      }
+
+      const prose = document.createElement('div');
+      prose.className = 'hist-prose';
+      prose.innerHTML = sec.prose;
+      card.appendChild(prose);
+
+      const cl = document.createElement('div');
+      cl.className = 'hist-clear';
+      card.appendChild(cl);
+
+      const box = document.createElement('div');
+      box.className = 'hist-prompt-box';
+
+      const plbl = document.createElement('div');
+      plbl.className = 'hist-prompt-label';
+      plbl.textContent = '▸ Think about it';
+      box.appendChild(plbl);
+
+      const pq = document.createElement('div');
+      pq.className = 'hist-prompt-q';
+      pq.textContent = sec.prompt;
+      box.appendChild(pq);
+
+      const ph = document.createElement('div');
+      ph.className = 'hist-prompt-hint';
+      ph.textContent = sec.hint;
+      box.appendChild(ph);
+
+      if (index === SECTIONS.length - 1) {
+        const ta = document.createElement('textarea');
+        ta.className = 'hist-textarea';
+        ta.id = 'hist-reflection';
+        ta.placeholder = 'Describe your experiment design here…';
+        ta.addEventListener('input', () => {
+          const btn = document.getElementById('hist-cta-2');
+          if (btn) btn.disabled = ta.value.trim().length < 10;
+        });
+        box.appendChild(ta);
+      }
+
+      const cta = document.createElement('button');
+      cta.className = 'hist-cta';
+      cta.id = `hist-cta-${index}`;
+      cta.textContent = sec.cta;
+      if (index === SECTIONS.length - 1) cta.disabled = true;
+      cta.addEventListener('click', () => _advance(index));
+      box.appendChild(cta);
+
+      card.appendChild(box);
+      return card;
+    }
+
+    function _updateProgress(index) {
+      SECTIONS.forEach((_, i) => {
+        const pip = document.getElementById(`hist-pip-${i}`);
+        if (!pip) return;
+        pip.className = 'hist-pip' + (i < index ? ' done' : i === index ? ' cur' : '');
+      });
+    }
+
+    function _revealSection(index) {
+      const card = _sectionEls[index];
+      if (!card) return;
+      requestAnimationFrame(() => {
+        card.classList.add('visible');
+        setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+      });
+      _updateProgress(index);
+      // Notify test harness
+      if (typeof _onSectionReveal === 'function') _onSectionReveal(index);
+    }
+
+    function _advance(fromIndex) {
+      const next = fromIndex + 1;
+      const btn = document.getElementById(`hist-cta-${fromIndex}`);
+      if (btn) {
+        btn.disabled = true; btn.textContent = '✓ Done';
+        btn.style.cssText = 'background:transparent;color:var(--accent,#4df0b0);border:1.5px solid var(--border2,#2e3850);font-size:0.82rem;font-weight:700;padding:9px 20px;border-radius:8px;cursor:default;';
+      }
+      if (next < SECTIONS.length) {
+        _currentSection = next;
+        _revealSection(next);
+      } else {
+        _complete = true;
+        _updateProgress(SECTIONS.length);
+        const banner = document.getElementById('hist-complete');
+        if (banner) {
+          banner.classList.add('visible');
+          setTimeout(() => banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+        }
+        if (_onComplete) _onComplete();
+      }
+    }
+
+    // Internal hook for test harness to observe section reveals
+    let _onSectionReveal = null;
+
+    function onComplete(fn)      { _onComplete = fn; }
+    function _setRevealHook(fn)  { _onSectionReveal = fn; }
+
+    function start() {
+      _injectStyles();
+      _buildDOM();
+      _currentSection = 0;
+      requestAnimationFrame(() => requestAnimationFrame(() => _revealSection(0)));
+    }
+
+    function reset() {
+      _currentSection = -1; _complete = false;
+      containerEl.innerHTML = '';
+    }
+
+    function getReflection() {
+      const ta = document.getElementById('hist-reflection');
+      return ta ? ta.value.trim() : '';
+    }
+
+    return {
+      onComplete, start, reset,
+      isComplete    : () => _complete,
+      getReflection,
+      _setRevealHook,
+      SECTION_COUNT : SECTIONS.length,
+    };
+  }
+
+  return { create, SECTION_COUNT: SECTIONS.length };
+})();
+</script>
+
+<!-- Test harness glue -->
+<script>
+const hist = DrawHistory.create(document.getElementById('histContainer'));
+
+// Wire section reveal to chip updates
+hist._setRevealHook(index => {
+  updateChip(index);
+  log(`<span class="info">Section ${index + 1} revealed</span>`);
+});
+
+hist.onComplete(() => {
+  document.getElementById('chip-done').classList.add('done');
+  const reflection = hist.getReflection();
+  document.getElementById('reflectionOut').textContent = reflection || '(no text)';
+  log('<span class="ok">✓ Lab complete! Reflection captured.</span>');
+  log('<span class="ok">  Length: ' + reflection.length + ' chars</span>');
+});
+
+function doStart() {
+  resetChips();
+  hist.start();
+  log('Started history card');
+  updateChip(0);
+}
+
+function doReset() {
+  hist.reset();
+  resetChips();
+  document.getElementById('reflectionOut').textContent = 'Shown here after student submits.';
+  log('Reset');
+}
+
+function updateChip(index) {
+  // Mark previous chips done, current active
+  for (let i = 0; i < 3; i++) {
+    const chip = document.getElementById(`chip-${i}`);
+    if (!chip) continue;
+    chip.classList.remove('active', 'done');
+    if (i < index) chip.classList.add('done');
+    else if (i === index) chip.classList.add('active');
+  }
+}
+
+function resetChips() {
+  for (let i = 0; i < 3; i++) {
+    const chip = document.getElementById(`chip-${i}`);
+    if (chip) chip.classList.remove('active', 'done');
+  }
+  document.getElementById('chip-done').classList.remove('active', 'done');
+}
+
+function log(msg) {
+  const el = document.getElementById('log');
+  el.innerHTML += `<div>${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+log('Ready. Click ▶ Start History Card.');
+</script>
+</body>
+</html>

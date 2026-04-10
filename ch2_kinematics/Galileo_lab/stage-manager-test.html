@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>stage-manager.js — Test Harness</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0c12; color: #eef2ff;
+    font-family: 'DM Mono', monospace;
+    padding: 32px; font-size: 13px; line-height: 1.8;
+  }
+  h2 { color: #4df0b0; margin: 24px 0 8px; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .pass  { color: #4df0b0; }
+  .fail  { color: #ff6b6b; }
+  .info  { color: #a8b4d0; }
+  .warn  { color: #ffd166; }
+  .section { background: #111520; border: 1px solid #252d42; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .progress-track {
+    height: 8px; background: #1a2035; border-radius: 4px;
+    margin: 12px 0; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: #4df0b0;
+    border-radius: 4px; transition: width 0.4s ease;
+  }
+  .stage-pills { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .pill {
+    padding: 4px 12px; border-radius: 20px; font-size: 11px;
+    border: 1px solid #252d42; color: #6b7a99; background: #0a0c12;
+  }
+  .pill.current  { border-color: #4df0b0; color: #4df0b0; background: rgba(77,240,176,0.1); }
+  .pill.done     { border-color: #4df0b0; color: #0a0c12; background: #4df0b0; }
+  .pill.unlocked { border-color: #ffd166; color: #ffd166; }
+  .log { font-size: 11px; color: #6b7a99; margin-top: 8px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h2 style="margin-top:0">stage-manager.js — Test Harness</h2>
+<p class="info" style="margin-bottom:24px">Simulates a student completing all stages with correct gate behaviour.</p>
+
+<div class="section">
+  <h2>1 — Gate Tests (should block before requirements met)</h2>
+  <div id="gateTests"></div>
+</div>
+
+<div class="section">
+  <h2>2 — Full Sequential Walkthrough</h2>
+  <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  <div class="stage-pills" id="stagePills"></div>
+  <div id="walkthroughLog" class="log"></div>
+</div>
+
+<div class="section">
+  <h2>3 — Backwards Navigation (should always fail)</h2>
+  <div id="backTests"></div>
+</div>
+
+<div class="section">
+  <h2>4 — Stage Metadata</h2>
+  <div id="metaTable"></div>
+</div>
+
+<script src="src/data-logger.js"></script>
+<script src="src/stage-manager.js"></script>
+<script>
+
+function pass(msg, detail='') {
+  return `<div class="pass">✓ ${msg}<span class="info" style="margin-left:12px">${detail}</span></div>`;
+}
+function fail(msg, detail='') {
+  return `<div class="fail">✗ ${msg}<span class="info" style="margin-left:12px">${detail}</span></div>`;
+}
+function check(label, condition, detail='') {
+  return condition ? pass(label, detail) : fail(label, detail);
+}
+
+// ── HELPERS ─────────────────────────────────────────────────────────────────
+function simulateResponse(questionId) {
+  const q = DataLogger.QUESTIONS[questionId];
+  if (!q) return;
+  DataLogger.logResponse({
+    stage       : q.stage,
+    questionId  : q.id,
+    questionText: q.text,
+    mcqChoice   : q.choices[0].key,
+    mcqLabel    : q.choices[0].label,
+    explanation : 'Test explanation',
+    correct     : q.correctKey ? (q.choices[0].key === q.correctKey) : null,
+  });
+}
+
+// ── TEST 1: GATE BLOCKING ────────────────────────────────────────────────────
+{
+  const out = [];
+
+  // Setup session first
+  StageManager.setupSession('TEST01', 'TestStudent');
+  StageManager.startLab();
+
+  // Try to jump to stage 2 without prediction
+  const jump2 = StageManager.goToStage(2);
+  out.push(check(
+    'Cannot jump to stage 2 without ramp_prediction',
+    !jump2.ok,
+    `reason: "${jump2.reason}"`
+  ));
+
+  // Try to jump to stage 3 without ramp_discovery
+  const jump3 = StageManager.goToStage(3);
+  out.push(check(
+    'Cannot jump to stage 3 without ramp_discovery',
+    !jump3.ok,
+    `reason: "${jump3.reason}"`
+  ));
+
+  // Try to jump to stage 5 (history) immediately
+  const jump5 = StageManager.goToStage(5);
+  out.push(check(
+    'Cannot jump to stage 5 without completing drop lab',
+    !jump5.ok,
+    `reason: "${jump5.reason}"`
+  ));
+
+  // Currently at stage 0 still
+  out.push(check(
+    'Still at stage 0 after all failed jumps',
+    StageManager.currentStage() === 0,
+    `current=${StageManager.currentStage()}`
+  ));
+
+  document.getElementById('gateTests').innerHTML = out.join('');
+}
+
+// ── TEST 2: FULL WALKTHROUGH ──────────────────────────────────────────────────
+{
+  const log = [];
+  const updates = [];
+
+  StageManager.onStageChange((next, prev) => {
+    updates.push({ next, prev });
+  });
+
+  function updateUI() {
+    const pct = Math.round(StageManager.progress() * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    const pills = StageManager.STAGE_META.map(m => {
+      const cur  = m.id === StageManager.currentStage();
+      const done = StageManager.isCompleted(m.id);
+      const cls  = done ? 'pill done' : cur ? 'pill current' : 'pill';
+      return `<span class="${cls}">${m.id}: ${m.key}</span>`;
+    }).join('');
+    document.getElementById('stagePills').innerHTML = pills;
+  }
+
+  function step(description, action) {
+    const result = action();
+    const icon = (result && result.ok === false) ? '✗' : '→';
+    const color = (result && result.ok === false) ? '#ff6b6b' : '#4df0b0';
+    log.push(`<span style="color:${color}">${icon}</span> <span class="info">${description}</span>` +
+      (result?.reason ? ` <span style="color:#ffd166">[${result.reason}]</span>` : ''));
+    updateUI();
+  }
+
+  // Stage 0 complete
+  step('Complete stage 0 (hook watched)', () => {
+    StageManager.completeCurrentStage();
+    return { ok: true };
+  });
+
+  // Advance to stage 1
+  step('Advance to stage 1 (prediction)', () => StageManager.advance());
+
+  // Try to advance without answering
+  step('Try advance to stage 2 without prediction [should block]', () => StageManager.advance());
+
+  // Answer ramp prediction
+  step('Student answers ramp_prediction', () => {
+    simulateResponse('ramp_prediction');
+    return { ok: true };
+  });
+
+  // Now advance to stage 2
+  step('Advance to stage 2 (ramp lab) [should work]', () => StageManager.advance());
+
+  // Try to advance without ramp_discovery
+  step('Try advance to stage 3 without ramp_discovery [should block]', () => StageManager.advance());
+
+  // Answer ramp_discovery
+  step('Student records ramp_discovery', () => {
+    simulateResponse('ramp_discovery');
+    return { ok: true };
+  });
+
+  // Advance to stage 3
+  step('Advance to stage 3 (bridge)', () => StageManager.advance());
+
+  // Try to advance without bridge_question
+  step('Try advance to stage 4 without bridge answer [should block]', () => StageManager.advance());
+
+  // Answer bridge
+  step('Student answers bridge_question', () => {
+    simulateResponse('bridge_question');
+    return { ok: true };
+  });
+
+  // Advance to stage 4
+  step('Advance to stage 4 (drop lab)', () => StageManager.advance());
+
+  // Try to advance without all drop demos
+  step('Try advance to stage 5 without drop demos [should block]', () => StageManager.advance());
+
+  // Complete all drop demos
+  step('Complete all drop demos', () => {
+    ['drop_paper_flat','drop_paper_crumpled','drop_paper_book','final_explanation']
+      .forEach(simulateResponse);
+    return { ok: true };
+  });
+
+  // Advance to stage 5
+  step('Advance to stage 5 (history) [should work]', () => StageManager.advance());
+
+  // Try to go beyond
+  step('Try to advance past final stage [should fail]', () => StageManager.advance());
+
+  updateUI();
+  document.getElementById('walkthroughLog').innerHTML = log.join('<br>');
+
+  // Verify callback fired correct number of times
+  // Should have fired for: stage0→1, 1→2, 2→3, 3→4, 4→5 = 5 times
+  const callbackDiv = document.createElement('div');
+  callbackDiv.innerHTML = '<br>' + check(
+    `onStageChange fired ${updates.length} times (expected 5)`,
+    updates.length === 5,
+    updates.map(u=>`${u.prev}→${u.next}`).join(', ')
+  );
+  document.getElementById('walkthroughLog').appendChild(callbackDiv);
+}
+
+// ── TEST 3: BACKWARDS NAVIGATION ─────────────────────────────────────────────
+{
+  const out = [];
+  // Currently at stage 5
+  out.push(check(
+    'At stage 5 after walkthrough',
+    StageManager.currentStage() === 5,
+    `current=${StageManager.currentStage()}`
+  ));
+  const back = StageManager.goToStage(3);
+  out.push(check(
+    'Cannot go back to stage 3',
+    !back.ok,
+    `reason: "${back.reason}"`
+  ));
+  out.push(check(
+    'Still at stage 5 after failed backwards attempt',
+    StageManager.currentStage() === 5
+  ));
+  document.getElementById('backTests').innerHTML = out.join('');
+}
+
+// ── TEST 4: METADATA TABLE ───────────────────────────────────────────────────
+{
+  let html = `<table style="width:100%;border-collapse:collapse">
+    <tr>
+      <th style="color:#6b7a99;padding:3px 12px 3px 0;font-size:11px">ID</th>
+      <th style="color:#6b7a99;padding:3px 12px 3px 0;font-size:11px">Key</th>
+      <th style="color:#6b7a99;padding:3px 12px 3px 0;font-size:11px">Title</th>
+      <th style="color:#6b7a99;padding:3px 12px 3px 0;font-size:11px">canSkip</th>
+    </tr>`;
+  StageManager.STAGE_META.forEach(m => {
+    html += `<tr>
+      <td style="padding:2px 12px 2px 0" class="pass">${m.id}</td>
+      <td style="padding:2px 12px 2px 0" class="info">${m.key}</td>
+      <td style="padding:2px 12px 2px 0">${m.title}</td>
+      <td style="padding:2px 12px 2px 0" class="${m.canSkip ? 'warn' : 'pass'}">${m.canSkip}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  document.getElementById('metaTable').innerHTML = html;
+}
+
+</script>
+</body>
+</html>

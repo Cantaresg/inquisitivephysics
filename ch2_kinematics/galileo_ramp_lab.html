@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galileo's Ramp — PhysicsSims</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #0a0c12;
+  --surface: #111520;
+  --surface2: #161b28;
+  --border: #252d42;
+  --border2: #2e3850;
+  --accent: #4df0b0;
+  --accent-dim: rgba(77,240,176,0.12);
+  --gold: #ffd166;
+  --gold-dim: rgba(255,209,102,0.12);
+  --purple: #c77dff;
+  --purple-dim: rgba(199,125,255,0.12);
+  --red: #ff6b6b;
+  --orange: #ff9f43;
+  --orange-dim: rgba(255,159,67,0.12);
+  --text: #eef2ff;
+  --text-mid: #a8b4d0;
+  --text-dim: #6b7a99;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+header {
+  display: flex; align-items: center;
+  padding: 0 24px; height: 52px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  gap: 16px; flex-shrink: 0;
+}
+.logo { font-size: 1rem; font-weight: 700; color: var(--accent); }
+.logo em { color: var(--text); font-style: normal; }
+.page-title { font-size: 0.82rem; color: var(--text-mid); font-weight: 500; }
+.lab-tabs {
+  display: flex; gap: 2px; margin-left: auto;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px;
+}
+.lab-tab {
+  font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.04em;
+  padding: 4px 12px; border-radius: 5px; cursor: pointer; border: none;
+  background: transparent; color: var(--text-dim); transition: all 0.15s; font-weight: 500;
+}
+.lab-tab.active { background: var(--surface2); color: var(--accent); }
+.lab-tab:not(.active):hover { color: var(--text-mid); }
+.mode-pill {
+  font-family: 'DM Mono', monospace; font-size: 0.68rem;
+  padding: 3px 11px; border-radius: 20px;
+  border: 1px solid var(--accent); color: var(--accent);
+  background: var(--accent-dim); letter-spacing: 0.05em;
+  transition: all 0.2s;
+}
+.mode-pill.friction { border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
+
+/* LAYOUT */
+.app { display: flex; flex: 1; min-height: 0; }
+
+/* SIM COLUMN */
+.sim-col {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  padding: 16px 20px; gap: 12px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.btn {
+  font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600;
+  padding: 7px 14px; border-radius: 7px;
+  border: 1.5px solid var(--border2); background: var(--surface2);
+  color: var(--text); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.btn.active { background: var(--accent); color: #050a0a; border-color: var(--accent); font-weight: 700; }
+.btn.go { background: var(--accent); color: #050a0a; border-color: var(--accent); font-weight: 700; }
+.btn.go:hover { background: #38d49a; }
+.btn.danger:hover { border-color: var(--red); color: var(--red); background: rgba(255,107,107,0.1); }
+.btn.gold-style:hover { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+.btn.orange-style { border-color: var(--border2); }
+.btn.orange-style:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+.divider { width: 1px; height: 26px; background: var(--border2); margin: 0 2px; flex-shrink: 0; }
+
+/* CANVAS */
+.canvas-frame {
+  position: relative; border-radius: 12px;
+  border: 1px solid var(--border2); background: var(--surface);
+  overflow: hidden; box-shadow: 0 4px 40px rgba(0,0,0,0.5);
+  flex-shrink: 0;
+}
+.canvas-frame::after {
+  content: ''; position: absolute; inset: 0; border-radius: 12px;
+  pointer-events: none; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+#simCanvas { display: block; width: 100%; }
+
+/* PREDICTION PANEL */
+.predict-panel {
+  background: var(--surface); border: 1.5px solid var(--border2); border-radius: 11px;
+  padding: 14px 18px; flex-shrink: 0;
+  transition: border-color 0.3s;
+}
+.predict-panel.locked { border-color: var(--gold); }
+.predict-panel.correct { border-color: var(--accent); }
+.predict-panel.wrong { border-color: var(--red); }
+.predict-title {
+  font-size: 0.62rem; font-family: 'DM Mono', monospace;
+  color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase;
+  font-weight: 500; margin-bottom: 10px;
+}
+.predict-q { font-size: 0.85rem; color: var(--text-mid); margin-bottom: 10px; font-weight: 500; }
+.predict-choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.pred-btn {
+  font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 600;
+  padding: 7px 16px; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+  border: 1.5px solid var(--border2); background: var(--bg); color: var(--text-mid);
+}
+.pred-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+.pred-btn.selected { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); font-weight: 700; }
+.pred-btn.correct  { border-color: var(--accent)!important; color: var(--accent)!important; background: var(--accent-dim)!important; }
+.pred-btn.wrong    { border-color: var(--red)!important; color: var(--red)!important; background: rgba(255,107,107,0.1)!important; }
+.pred-btn:disabled { cursor: not-allowed; }
+.predict-result {
+  margin-top: 9px; font-size: 0.8rem; line-height: 1.5;
+  color: var(--text-mid); display: none;
+}
+
+/* DATA BAR */
+.data-bar {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 9px; flex-shrink: 0;
+}
+.di { display: flex; flex-direction: column; gap: 2px; }
+.di-lbl { font-size: 0.62rem; color: var(--text-dim); font-family: 'DM Mono', monospace; letter-spacing: 0.07em; text-transform: uppercase; }
+.di-val { font-size: 0.88rem; font-family: 'DM Mono', monospace; font-weight: 500; color: var(--text); }
+.di-val.c-accent { color: var(--accent); }
+.di-val.c-gold   { color: var(--gold); }
+.di-val.c-purple { color: var(--purple); }
+.di-val.c-orange { color: var(--orange); }
+
+/* GRAPH */
+#graphCanvas {
+  width: 100%; border-radius: 10px;
+  border: 1px solid var(--border2); display: none; flex-shrink: 0;
+}
+
+/* SIDE PANEL */
+.side-panel {
+  width: 292px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  overflow-y: auto; background: var(--surface);
+}
+.ps { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); }
+.ps:last-child { border-bottom: none; }
+.ps-title {
+  font-size: 0.62rem; font-family: 'DM Mono', monospace;
+  color: var(--text-dim); letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 12px; font-weight: 500;
+}
+
+/* Sliders */
+.sr { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.sr-lbl { font-size: 0.78rem; color: var(--text-mid); font-weight: 500; min-width: 96px; }
+.sr-val { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--accent); min-width: 52px; text-align: right; font-weight: 500; }
+input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; }
+
+/* Object selector cards */
+.obj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 4px; }
+.oc {
+  padding: 9px 7px; border: 1.5px solid var(--border2); border-radius: 9px;
+  background: var(--bg); cursor: pointer; transition: all 0.15s;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.oc:hover { border-color: var(--accent); background: var(--accent-dim); }
+.oc.active-heavy { border-color: var(--purple); background: var(--purple-dim); }
+.oc.active-light { border-color: var(--gold); background: var(--gold-dim); }
+.oc-icon { font-size: 1.3rem; }
+.oc-name { font-size: 0.68rem; font-weight: 600; color: var(--text); }
+.oc-mass { font-size: 0.58rem; color: var(--text-dim); font-family: 'DM Mono', monospace; }
+.oc.active-heavy .oc-name { color: var(--purple); }
+.oc.active-light .oc-name { color: var(--gold); }
+
+/* Color legend dots */
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+
+/* Table */
+.table-wrap { max-height: 180px; overflow-y: auto; border-radius: 7px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+th {
+  font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--text-dim);
+  text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--border);
+  background: var(--surface2); position: sticky; top: 0; letter-spacing: 0.05em;
+}
+td {
+  font-family: 'DM Mono', monospace; font-size: 0.7rem;
+  padding: 5px 7px; border-bottom: 1px solid rgba(255,255,255,0.03); color: var(--text-mid);
+}
+tbody tr:last-child td { color: var(--accent); }
+tbody tr:hover td { background: var(--surface2); }
+.empty-st { padding: 14px; text-align: center; color: var(--text-dim); font-size: 0.76rem; line-height: 1.6; }
+
+/* AI */
+.api-row { display: flex; gap: 7px; margin-bottom: 9px; }
+.api-input {
+  flex: 1; background: var(--bg); border: 1.5px solid var(--border2); border-radius: 7px;
+  padding: 6px 10px; font-family: 'DM Mono', monospace; font-size: 0.7rem;
+  color: var(--text); outline: none; transition: border-color 0.15s;
+}
+.api-input:focus { border-color: var(--accent); }
+.api-input::placeholder { color: var(--text-dim); }
+.ai-box {
+  background: var(--bg); border: 1.5px solid var(--border2); border-radius: 9px;
+  padding: 12px; font-size: 0.78rem; line-height: 1.65; color: var(--text-mid);
+  min-height: 70px; margin-bottom: 9px;
+}
+.ai-box.lit { border-color: rgba(77,240,176,0.3); }
+.ai-tag { display: block; font-family: 'DM Mono', monospace; font-size: 0.58rem; color: var(--accent); letter-spacing: 0.1em; margin-bottom: 7px; text-transform: uppercase; }
+.ai-qs { display: flex; flex-direction: column; gap: 5px; }
+.ai-q {
+  background: var(--bg); border: 1.5px solid var(--border); border-radius: 7px;
+  padding: 7px 10px; font-size: 0.73rem; color: var(--text-mid);
+  cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s; line-height: 1.4;
+}
+.ai-q:hover { border-color: var(--accent); color: var(--text); background: var(--accent-dim); }
+
+/* Timer row */
+.timer-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 10px 16px; flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.sw-face { display: flex; align-items: baseline; gap: 2px; font-family: 'DM Mono', monospace; font-weight: 500; line-height: 1; }
+.sw-seg { font-size: 1.5rem; color: var(--accent); letter-spacing: 0.02em; }
+.sw-sep { font-size: 1.3rem; color: var(--text-dim); margin: 0 1px; }
+.sw-cs  { font-size: 1.1rem; color: var(--accent); opacity: 0.85; }
+.sw-unit { font-size: 0.62rem; color: var(--text-dim); align-self: flex-end; margin-left: 1px; margin-bottom: 3px; }
+.sw-divider { width: 1px; height: 32px; background: var(--border2); margin: 0 4px; }
+.timer-pair { display: flex; flex-direction: column; gap: 1px; }
+.timer-pair-lbl { font-size: 0.58rem; color: var(--text-dim); font-family: 'DM Mono', monospace; letter-spacing: 0.07em; text-transform: uppercase; }
+.timer-pair-vals { display: flex; gap: 14px; }
+.timer-val { font-family: 'DM Mono', monospace; font-size: 0.88rem; font-weight: 500; }
+
+@media (max-width: 860px) {
+  .app { flex-direction: column; }
+  .side-panel { width: 100%; border-top: 1px solid var(--border); }
+  .sim-col { border-right: none; }
+  .lab-tabs { margin-left: 8px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Physics<em>Sims</em></div>
+  <div class="page-title">Kinematics · Galileo's Ramp</div>
+  <div class="lab-tabs">
+    <button class="lab-tab active">Lab 1 — Galileo</button>
+    <button class="lab-tab" style="opacity:0.4;cursor:not-allowed" title="Coming soon">Lab 2 — Photogates</button>
+    <button class="lab-tab" style="opacity:0.4;cursor:not-allowed" title="Coming soon">Lab 3 — Vectors</button>
+  </div>
+  <div class="mode-pill" id="modePill" style="margin-left:12px">IDEAL MODE</div>
+</header>
+
+<div class="app">
+  <!-- SIM COLUMN -->
+  <div class="sim-col">
+
+    <div class="toolbar">
+      <button class="btn active" id="btnIdeal" onclick="setMode('ideal')">Ideal</button>
+      <button class="btn orange-style" id="btnFriction" onclick="setMode('friction')">Lab Mode</button>
+      <div class="divider"></div>
+      <button class="btn go" id="btnRelease" onclick="toggleRelease()">▶ Release</button>
+      <button class="btn danger" onclick="resetSim()">↺ Reset</button>
+      <div class="divider"></div>
+      <button class="btn" id="btnRecord" onclick="recordRun()" disabled>⊕ Record Run</button>
+      <button class="btn gold-style" onclick="downloadCSV()">↓ CSV</button>
+      <button class="btn gold-style" id="btnGraph" onclick="showGraph()">Show Graph</button>
+    </div>
+
+    <div class="canvas-frame">
+      <canvas id="simCanvas" width="760" height="420"></canvas>
+    </div>
+
+    <!-- Prediction panel -->
+    <div class="predict-panel" id="predictPanel">
+      <div class="predict-title">▸ Prediction — Make your prediction before running!</div>
+      <div class="predict-q" id="predictQ">Which object will reach the bottom of the ramp first?</div>
+      <div class="predict-choices">
+        <button class="pred-btn" id="predHeavy" onclick="makePrediction('heavy')">
+          <span class="dot" id="heavyDot" style="background:#c77dff"></span>Heavy object
+        </button>
+        <button class="pred-btn" id="predLight" onclick="makePrediction('light')">
+          <span class="dot" id="lightDot" style="background:#ffd166"></span>Light object
+        </button>
+        <button class="pred-btn" id="predSame"  onclick="makePrediction('same')">They arrive at the same time</button>
+      </div>
+      <div class="predict-result" id="predictResult"></div>
+    </div>
+
+    <!-- Timer row -->
+    <div class="timer-row">
+      <div class="sw-face">
+        <span class="sw-seg" id="swS">00</span><span class="sw-sep">.</span><span class="sw-cs" id="swCS">000</span><span class="sw-unit">s</span>
+      </div>
+      <div class="sw-divider"></div>
+      <div class="timer-pair">
+        <span class="timer-pair-lbl">Finish times</span>
+        <div class="timer-pair-vals">
+          <span class="timer-val" style="color:var(--purple)" id="tHeavy">—</span>
+          <span class="timer-val" style="color:var(--gold)"   id="tLight">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data bar -->
+    <div class="data-bar">
+      <div class="di"><span class="di-lbl">Ramp Length</span><span class="di-val c-accent" id="infoL">1.00 m</span></div>
+      <div class="di"><span class="di-lbl">Ramp Angle</span><span class="di-val c-accent" id="infoA">30°</span></div>
+      <div class="di"><span class="di-lbl">t (theory)</span><span class="di-val c-gold" id="infoTT">—</span></div>
+      <div class="di"><span class="di-lbl">a = g·sin θ</span><span class="di-val c-purple" id="infoAcc">—</span></div>
+      <div class="di"><span class="di-lbl">Heavy finish</span><span class="di-val c-purple" id="infoTH">—</span></div>
+      <div class="di"><span class="di-lbl">Light finish</span><span class="di-val c-gold" id="infoTL">—</span></div>
+    </div>
+
+    <canvas id="graphCanvas" width="760" height="300"></canvas>
+
+  </div>
+
+  <!-- SIDE PANEL -->
+  <div class="side-panel">
+
+    <div class="ps">
+      <div class="ps-title">Object Selection</div>
+      <div class="obj-grid">
+        <div class="oc active-heavy" id="oc_iron" onclick="setHeavy('iron')">
+          <div class="oc-icon">⚙️</div><div class="oc-name">Iron Ball</div><div class="oc-mass">5 kg</div>
+        </div>
+        <div class="oc" id="oc_wood" onclick="setHeavy('wood')">
+          <div class="oc-icon">🪵</div><div class="oc-name">Wood Block</div><div class="oc-mass">8 kg</div>
+        </div>
+        <div class="oc" id="oc_lead" onclick="setHeavy('lead')">
+          <div class="oc-icon">🔩</div><div class="oc-name">Lead Slug</div><div class="oc-mass">12 kg</div>
+        </div>
+        <div class="oc" id="oc_bowling" onclick="setHeavy('bowling')">
+          <div class="oc-icon">🎳</div><div class="oc-name">Bowling Ball</div><div class="oc-mass">7 kg</div>
+        </div>
+      </div>
+      <div style="font-size:0.62rem; color:var(--text-dim); font-family:'DM Mono',monospace; margin-top:4px; margin-bottom:10px;">vs. Light object: 🏓 Ping-pong ball (0.003 kg)</div>
+      <div style="font-size:0.68rem; color:var(--text-dim); line-height:1.5;">
+        <span class="dot" style="background:var(--purple)"></span><span style="color:var(--purple)">Purple</span> = heavy object &nbsp;
+        <span class="dot" style="background:var(--gold)"></span><span style="color:var(--gold)">Gold</span> = light object
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Ramp Parameters</div>
+      <div class="sr">
+        <span class="sr-lbl">Length (L)</span>
+        <input type="range" id="sliderL" min="0.5" max="3.0" step="0.1" value="1.0" oninput="updateParams()">
+        <span class="sr-val" id="lblL">1.00 m</span>
+      </div>
+      <div class="sr">
+        <span class="sr-lbl">Angle (θ)</span>
+        <input type="range" id="sliderAngle" min="5" max="60" step="1" value="30" oninput="updateParams()">
+        <span class="sr-val" id="lblAngle">30°</span>
+      </div>
+      <div class="sr" id="frictionRow" style="display:none">
+        <span class="sr-lbl">Surface μ</span>
+        <input type="range" id="sliderMu" min="0.00" max="0.20" step="0.01" value="0.05" oninput="updateParams()">
+        <span class="sr-val" id="lblMu">0.05</span>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">Discovery: t² vs L</div>
+      <div class="table-wrap">
+        <div class="empty-st" id="emptyState">No data yet.<br>Run experiments, then<br>⊕ Record Run.</div>
+        <table id="dataTable" style="display:none">
+          <thead><tr><th>#</th><th>L (m)</th><th>θ°</th><th>t (s)</th><th>t² (s²)</th></tr></thead>
+          <tbody id="dataBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:9px; display:flex; gap:7px;">
+        <button class="btn danger" onclick="clearData()" style="font-size:0.73rem; padding:5px 11px;">Clear Data</button>
+      </div>
+    </div>
+
+    <div class="ps">
+      <div class="ps-title">AI Explainer</div>
+      <div class="api-row">
+        <input class="api-input" type="password" id="apiKey" placeholder="Anthropic API key (optional)">
+        <button class="btn" onclick="saveKey()" style="padding:6px 11px; font-size:0.76rem">Save</button>
+      </div>
+      <div class="ai-box" id="aiBox">
+        <span class="ai-tag">▸ Physics Guide</span>
+        Make your prediction, then release both objects. Vary the ramp length to discover how <strong>t²</strong> relates to <strong>L</strong>.
+        <br><br><span style="color:var(--text-dim);font-size:0.73rem">Add an API key for interactive explanations.</span>
+      </div>
+      <div class="ai-qs">
+        <button class="ai-q" onclick="askAI('mass_result')">Why do both objects reach the bottom at the same time?</button>
+        <button class="ai-q" onclick="askAI('t_squared')">Why does t² vary linearly with L?</button>
+        <button class="ai-q" onclick="askAI('friction_effect')">How does friction affect the result in Lab Mode?</button>
+        <button class="ai-q" onclick="askAI('galileo_history')">What did Galileo actually discover?</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const g = 9.81;
+const W = 760, H = 420;
+
+// ── OBJECTS ────────────────────────────────────────────────────────────────
+const OBJECTS = {
+  iron:    { name:'Iron Ball',     mass:5,    icon:'⚙️',  radius:18, color:'#a8b8d0', shine:'#d0e0f0' },
+  wood:    { name:'Wood Block',    mass:8,    icon:'🪵',  radius:20, color:'#b07040', shine:'#d09060', isBox:true },
+  lead:    { name:'Lead Slug',     mass:12,   icon:'🔩',  radius:16, color:'#6878a0', shine:'#9090b8' },
+  bowling: { name:'Bowling Ball',  mass:7,    icon:'🎳',  radius:21, color:'#303850', shine:'#506080' },
+};
+const LIGHT = { name:'Ping-pong ball', mass:0.003, radius:10, color:'#fff8c0', shine:'#fffadc' };
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let S = {
+  mode: 'ideal',
+  heavyKey: 'iron',
+  L: 1.0, angleDeg: 30, mu: 0.05,
+  running: false, released: false,
+  simT: 0,
+  // positions along ramp (0=top, 1=bottom)
+  sHeavy: 0, sLight: 0,
+  vHeavy: 0, vLight: 0,
+  doneHeavy: false, doneLight: false,
+  tHeavy: null, tLight: null,
+};
+let prediction = null;
+let predictionLocked = false;
+let dataRows = [];
+let apiKey = '';
+let lastTs = null;
+let animRunning = false;
+let swTime = 0, swRunning = false;
+let trajectory = []; // [{t, sH, sL}]
+
+// ── PHYSICS ────────────────────────────────────────────────────────────────
+function getAngleRad(){ return S.angleDeg * Math.PI / 180; }
+function accel(mass, isLight){
+  const th = getAngleRad();
+  const aSin = g * Math.sin(th);
+  if(S.mode === 'ideal') return aSin;
+  // Lab mode: rolling/sliding friction (kinetic), constant μ
+  const muEff = S.mu;
+  // friction force opposes motion (down ramp), so reduces acceleration
+  const aFric = muEff * g * Math.cos(th);
+  return Math.max(0, aSin - aFric);
+}
+function theoreticalTime(L, angleDeg, mu, mode){
+  const th = angleDeg * Math.PI / 180;
+  const a = (mode === 'ideal') ? g * Math.sin(th) : Math.max(0.01, g * Math.sin(th) - mu * g * Math.cos(th));
+  return Math.sqrt(2 * L / a);
+}
+
+// ── LOOP ───────────────────────────────────────────────────────────────────
+function loop(ts){
+  if(!lastTs) lastTs = ts;
+  const wdt = Math.min((ts - lastTs) / 1000, 0.033);
+  lastTs = ts;
+
+  if(S.running){
+    const dt = wdt;
+    const aH = accel(OBJECTS[S.heavyKey].mass, false);
+    const aL = accel(LIGHT.mass, true);
+    S.simT += dt;
+
+    if(!S.doneHeavy){ S.vHeavy += aH*dt; S.sHeavy += S.vHeavy*dt; }
+    if(!S.doneLight){ S.vLight += aL*dt; S.sLight += S.vLight*dt; }
+
+    if(!S.doneHeavy && S.sHeavy >= S.L){ S.sHeavy = S.L; S.doneHeavy = true; S.tHeavy = S.simT; }
+    if(!S.doneLight && S.sLight >= S.L){ S.sLight = S.L; S.doneLight = true; S.tLight = S.simT; }
+
+    trajectory.push({t: S.simT, sH: S.sHeavy, sL: S.sLight});
+
+    if(S.doneHeavy && S.doneLight){
+      S.running = false;
+      swRunning = false;
+      document.getElementById('btnRelease').textContent = '▶ Release';
+      document.getElementById('btnRelease').classList.add('go');
+      document.getElementById('btnRecord').disabled = false;
+      revealPrediction();
+    }
+  }
+
+  if(swRunning){
+    swTime += wdt;
+    renderTimer(swTime);
+  }
+
+  document.getElementById('tHeavy').textContent = S.tHeavy !== null ? S.tHeavy.toFixed(3)+' s' : '—';
+  document.getElementById('tLight').textContent = S.tLight !== null ? S.tLight.toFixed(3)+' s' : '—';
+
+  draw();
+  updateInfoBar();
+  requestAnimationFrame(loop);
+}
+
+// ── TIMER ──────────────────────────────────────────────────────────────────
+function renderTimer(t){
+  const s = Math.floor(t);
+  const ms = Math.floor((t - s) * 1000);
+  document.getElementById('swS').textContent  = String(s).padStart(2,'0');
+  document.getElementById('swCS').textContent = String(ms).padStart(3,'0');
+}
+
+// ── RAMP GEOMETRY ──────────────────────────────────────────────────────────
+// Ramp drawn from top-right (high end) to bottom-left (low end)
+// Top anchor: fixed visual position, bottom anchor determined by angle+length
+function getRampGeometry(){
+  const th = getAngleRad();
+  const Lpx = S.L * 160; // 160 px per metre max ~480px for L=3m
+  const tx = W * 0.72, ty = H * 0.18; // top of ramp (high end)
+  const bx = tx - Lpx * Math.cos(th);
+  const by = ty + Lpx * Math.sin(th);
+  return { tx, ty, bx, by, Lpx, th };
+}
+
+function rampPos(s){ // s = distance from top (0..L)
+  const {tx, ty, th, Lpx} = getRampGeometry();
+  const frac = s / S.L;
+  return {
+    x: tx - frac * Lpx * Math.cos(th),
+    y: ty + frac * Lpx * Math.sin(th),
+  };
+}
+
+// ── DRAW ───────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('simCanvas');
+const ctx    = canvas.getContext('2d');
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // Subtle grid
+  ctx.strokeStyle='rgba(255,255,255,0.018)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=50){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+  for(let y=0;y<H;y+=50){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+
+  const {tx, ty, bx, by, th} = getRampGeometry();
+
+  // Floor
+  ctx.fillStyle='#141a28';
+  ctx.fillRect(0, by, W, H - by);
+  ctx.strokeStyle='#252d42'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(0, by); ctx.lineTo(W, by); ctx.stroke();
+
+  // Ramp body (filled triangle)
+  ctx.beginPath();
+  ctx.moveTo(tx, ty);
+  ctx.lineTo(bx, by);
+  ctx.lineTo(tx, by);
+  ctx.closePath();
+  ctx.fillStyle='#161c2e';
+  ctx.fill();
+  ctx.strokeStyle='#2a3550'; ctx.lineWidth=1; ctx.stroke();
+
+  // Ramp surface
+  ctx.save();
+  const surfGrad = ctx.createLinearGradient(tx, ty, bx, by);
+  surfGrad.addColorStop(0, '#2e3f60');
+  surfGrad.addColorStop(1, '#1e2d45');
+  ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(bx,by); ctx.lineTo(bx-2,by+4); ctx.lineTo(tx-2,ty+4); ctx.closePath();
+  ctx.fillStyle=surfGrad; ctx.fill();
+
+  if(S.mode === 'friction'){
+    // Texture lines on ramp surface to suggest roughness
+    ctx.strokeStyle='rgba(255,159,67,0.15)'; ctx.lineWidth=1;
+    const rampLen = Math.sqrt((tx-bx)**2+(ty-by)**2);
+    const ux=(bx-tx)/rampLen, uy=(by-ty)/rampLen;
+    const px=-uy, py=ux;
+    for(let i=0;i<12;i++){
+      const t=i/12;
+      const cx=tx+ux*rampLen*t, cy=ty+uy*rampLen*t;
+      ctx.beginPath(); ctx.moveTo(cx+px*4,cy+py*4); ctx.lineTo(cx-px*4,cy-py*4); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Angle arc
+  ctx.save();
+  ctx.strokeStyle='rgba(77,240,176,0.35)'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.arc(bx, by, 36, -Math.PI/2, -Math.PI/2 + th, false); ctx.stroke();
+  ctx.fillStyle='rgba(77,240,176,0.5)'; ctx.font='12px DM Mono, monospace';
+  ctx.fillText(S.angleDeg+'°', bx+40, by-14);
+  ctx.restore();
+
+  // Length label
+  const midX=(tx+bx)/2, midY=(ty+by)/2;
+  const perpX=Math.sin(th), perpY=-Math.cos(th);
+  ctx.save();
+  ctx.fillStyle='rgba(77,240,176,0.45)'; ctx.font='11px DM Mono, monospace'; ctx.textAlign='center';
+  ctx.fillText('L = '+S.L.toFixed(1)+' m', midX+perpX*22, midY+perpY*22);
+  ctx.restore();
+
+  // Support pillar
+  ctx.fillStyle='#1a2240';
+  ctx.fillRect(tx-8, ty, 16, by-ty);
+  ctx.strokeStyle='#252d42'; ctx.lineWidth=1;
+  ctx.strokeRect(tx-8, ty, 16, by-ty);
+
+  // Top cap bracket
+  ctx.fillStyle='#2e3850';
+  ctx.beginPath(); ctx.roundRect(tx-14, ty-8, 28, 14, 3); ctx.fill();
+
+  // Objects on ramp
+  drawObject(S.sHeavy, OBJECTS[S.heavyKey], '#c77dff', 1);
+  drawObject(S.sLight, LIGHT, '#ffd166', -1);
+
+  // Ghost trail for heavy
+  if(trajectory.length > 2){
+    ctx.save(); ctx.globalAlpha = 0.18;
+    const step = Math.max(1, Math.floor(trajectory.length / 8));
+    for(let i=0; i<trajectory.length-step; i+=step){
+      const pos = rampPos(trajectory[i].sH);
+      const r = OBJECTS[S.heavyKey].radius;
+      ctx.beginPath(); ctx.arc(pos.x - r*Math.sin(th), pos.y - r*Math.cos(th), r*0.5, 0, Math.PI*2);
+      ctx.fillStyle='#c77dff'; ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Finish line
+  ctx.save();
+  const finPerpX = -Math.sin(th), finPerpY = Math.cos(th);
+  ctx.strokeStyle='rgba(255,107,107,0.6)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+  ctx.beginPath();
+  ctx.moveTo(bx + finPerpX*30, by + finPerpY*30);
+  ctx.lineTo(bx - finPerpX*10, by - finPerpY*10);
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,107,107,0.55)'; ctx.font='10px DM Mono, monospace';
+  ctx.textAlign='center';
+  ctx.fillText('FINISH', bx+finPerpX*36, by+finPerpY*36+4);
+  ctx.restore();
+
+  // Done banners
+  if(S.doneHeavy && S.doneLight){
+    const diff = Math.abs((S.tHeavy||0) - (S.tLight||0));
+    let msg;
+    if(diff < 0.005) msg = 'Both arrive simultaneously! ⚡';
+    else if((S.tHeavy||0) < (S.tLight||0)) msg = `Heavy wins by ${diff.toFixed(3)}s`;
+    else msg = `Light wins by ${diff.toFixed(3)}s`;
+    ctx.save();
+    ctx.fillStyle='rgba(10,12,18,0.75)';
+    ctx.beginPath(); ctx.roundRect(W/2-140, 12, 280, 36, 8); ctx.fill();
+    ctx.fillStyle='#eef2ff'; ctx.font='600 14px DM Sans, sans-serif'; ctx.textAlign='center';
+    ctx.fillText(msg, W/2, 35);
+    ctx.restore();
+  }
+
+  // Lab mode badge
+  if(S.mode === 'friction'){
+    ctx.save(); ctx.fillStyle='rgba(255,159,67,0.7)';
+    ctx.font='11px DM Mono, monospace'; ctx.textAlign='left';
+    ctx.fillText(`🔸 Lab Mode  |  μ = ${S.mu.toFixed(2)}  |  friction applied`, 16, H-16);
+    ctx.restore();
+  }
+
+  // Pre-release hint
+  if(!S.released){
+    ctx.save(); ctx.fillStyle='rgba(77,240,176,0.5)';
+    ctx.font='13px DM Sans, sans-serif'; ctx.textAlign='center';
+    ctx.fillText('Make your prediction below, then click ▶ Release', W/2, H-16);
+    ctx.restore();
+  }
+}
+
+function drawObject(s, obj, trackColor, side){
+  const pos = rampPos(s);
+  const th = getAngleRad();
+  // offset perpendicular to ramp so objects don't overlap
+  const perpX = -Math.sin(th), perpY = Math.cos(th);
+  const offset = side * (obj.radius + 2);
+  const cx = pos.x + perpX*offset;
+  const cy = pos.y + perpY*offset;
+  const r = obj.radius;
+
+  if(obj.isBox){
+    // Wood block — draw as rectangle aligned to ramp
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-th);
+    const w = r*2, h = r*1.5;
+    const bGrad = ctx.createLinearGradient(-w/2,-h/2,w/2,h/2);
+    bGrad.addColorStop(0, obj.shine); bGrad.addColorStop(1, obj.color);
+    ctx.fillStyle = bGrad;
+    ctx.beginPath(); ctx.roundRect(-w/2,-h/2,w,h,3); ctx.fill();
+    ctx.strokeStyle = trackColor+'88'; ctx.lineWidth=1.5; ctx.stroke();
+    // wood grain lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth=0.8;
+    for(let i=1;i<4;i++){ ctx.beginPath(); ctx.moveTo(-w/2,(-h/2)+(i*h/4)); ctx.lineTo(w/2,(-h/2)+(i*h/4)); ctx.stroke(); }
+    ctx.restore();
+  } else {
+    // Sphere
+    const sph = ctx.createRadialGradient(cx-r*.3,cy-r*.3,0,cx,cy,r);
+    sph.addColorStop(0, obj.shine); sph.addColorStop(0.6, obj.color+'cc'); sph.addColorStop(1, obj.color+'66');
+    const halo = ctx.createRadialGradient(cx,cy,0,cx,cy,r*2);
+    halo.addColorStop(0, trackColor+'30'); halo.addColorStop(1, 'transparent');
+    ctx.beginPath(); ctx.arc(cx,cy,r*2,0,Math.PI*2);
+    ctx.fillStyle=halo; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle=sph; ctx.shadowColor=trackColor+'55'; ctx.shadowBlur=14; ctx.fill();
+    ctx.strokeStyle=trackColor+'88'; ctx.lineWidth=1.5; ctx.stroke(); ctx.shadowBlur=0;
+  }
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────────
+function setMode(m){
+  S.mode = m;
+  document.getElementById('btnIdeal').classList.toggle('active', m==='ideal');
+  document.getElementById('btnFriction').classList.toggle('active', m==='friction');
+  const p = document.getElementById('modePill');
+  p.textContent = m==='ideal' ? 'IDEAL MODE' : 'LAB MODE';
+  p.className = 'mode-pill' + (m==='friction' ? ' friction' : '');
+  document.getElementById('frictionRow').style.display = m==='friction' ? 'flex' : 'none';
+  resetSim();
+}
+
+function setHeavy(key){
+  S.heavyKey = key;
+  document.querySelectorAll('.oc').forEach(c => c.className='oc');
+  document.getElementById('oc_'+key).classList.add('active-heavy');
+  // update color dot in prediction
+  resetSim();
+}
+
+function updateParams(){
+  S.L = parseFloat(document.getElementById('sliderL').value);
+  S.angleDeg = parseFloat(document.getElementById('sliderAngle').value);
+  S.mu = parseFloat(document.getElementById('sliderMu').value);
+  document.getElementById('lblL').textContent = S.L.toFixed(1)+' m';
+  document.getElementById('lblAngle').textContent = S.angleDeg+'°';
+  document.getElementById('lblMu').textContent = S.mu.toFixed(2);
+  updateInfoBar();
+}
+
+function toggleRelease(){
+  const btn = document.getElementById('btnRelease');
+  if(!S.released){
+    if(!predictionLocked){
+      // Nudge user to predict first, but allow skipping after one warning
+      if(!window._warnedPredict){
+        window._warnedPredict = true;
+        document.getElementById('predictResult').style.display='block';
+        document.getElementById('predictResult').style.color='var(--gold)';
+        document.getElementById('predictResult').textContent='💡 Tip: Make a prediction first! Click Release again to skip.';
+        return;
+      }
+    }
+    S.released = true; S.running = true;
+    swTime = 0; swRunning = true;
+    btn.textContent = '⏸ Pause'; btn.classList.remove('go');
+  } else if(S.running){
+    S.running = false; swRunning = false;
+    btn.textContent = '▶ Resume'; btn.classList.add('go');
+  } else {
+    S.running = true; swRunning = true;
+    btn.textContent = '⏸ Pause'; btn.classList.remove('go');
+  }
+}
+
+function resetSim(){
+  S.running = false; S.released = false;
+  S.simT = 0; S.sHeavy = 0; S.sLight = 0; S.vHeavy = 0; S.vLight = 0;
+  S.doneHeavy = false; S.doneLight = false; S.tHeavy = null; S.tLight = null;
+  trajectory = [];
+  swTime = 0; swRunning = false;
+  predictionLocked = false; prediction = null;
+  window._warnedPredict = false;
+  document.getElementById('btnRelease').textContent = '▶ Release';
+  document.getElementById('btnRelease').classList.add('go');
+  document.getElementById('btnRecord').disabled = true;
+  document.getElementById('tHeavy').textContent = '—';
+  document.getElementById('tLight').textContent = '—';
+  renderTimer(0);
+  resetPredictionUI();
+  updateInfoBar();
+}
+
+// ── PREDICTION ─────────────────────────────────────────────────────────────
+function makePrediction(choice){
+  if(predictionLocked) return;
+  prediction = choice;
+  predictionLocked = true;
+  ['predHeavy','predLight','predSame'].forEach(id => {
+    document.getElementById(id).disabled = true;
+    document.getElementById(id).classList.remove('selected');
+  });
+  const idMap = {heavy:'predHeavy', light:'predLight', same:'predSame'};
+  document.getElementById(idMap[choice]).classList.add('selected');
+  document.getElementById('predictPanel').classList.add('locked');
+  document.getElementById('predictResult').style.display='block';
+  document.getElementById('predictResult').style.color='var(--gold)';
+  document.getElementById('predictResult').textContent='Prediction locked! Now click ▶ Release to see what happens.';
+}
+
+function revealPrediction(){
+  if(!prediction) return;
+  const diff = Math.abs((S.tHeavy||0) - (S.tLight||0));
+  const idealResult = diff < 0.005 ? 'same' : ((S.tHeavy < S.tLight) ? 'heavy' : 'light');
+  const correct = prediction === idealResult;
+
+  const idMap = {heavy:'predHeavy', light:'predLight', same:'predSame'};
+  document.getElementById(idMap[prediction]).classList.add(correct ? 'correct' : 'wrong');
+  if(!correct) document.getElementById(idMap[idealResult]).classList.add('correct');
+
+  document.getElementById('predictPanel').classList.remove('locked');
+  document.getElementById('predictPanel').classList.add(correct ? 'correct' : 'wrong');
+
+  const msgs = {
+    ideal_same_correct: '✅ Correct! In ideal conditions, mass doesn\'t affect the time — both accelerate at a = g·sinθ regardless of mass.',
+    ideal_same_wrong: `❌ Surprising result! Both objects arrive at the same time. In ideal conditions, a = g·sinθ for ALL masses — Galileo\'s great insight!`,
+    friction_correct: '✅ Correct! With friction in lab mode, heavier objects feel more frictional force — but also have more inertia, so the effect nearly cancels.',
+    friction_wrong: '❌ Look at the finish times — friction still barely affects the relative result! The mass cancels in the equations.',
+  };
+
+  let msgKey;
+  if(S.mode === 'ideal'){
+    msgKey = correct ? 'ideal_same_correct' : 'ideal_same_wrong';
+  } else {
+    msgKey = correct ? 'friction_correct' : 'friction_wrong';
+  }
+
+  document.getElementById('predictResult').style.display='block';
+  document.getElementById('predictResult').style.color = correct ? 'var(--accent)' : 'var(--red)';
+  document.getElementById('predictResult').textContent = msgs[msgKey];
+}
+
+function resetPredictionUI(){
+  ['predHeavy','predLight','predSame'].forEach(id => {
+    const el = document.getElementById(id);
+    el.disabled = false;
+    el.classList.remove('selected','correct','wrong');
+  });
+  document.getElementById('predictPanel').className = 'predict-panel';
+  document.getElementById('predictResult').style.display='none';
+  document.getElementById('predictResult').textContent='';
+}
+
+// ── INFO BAR ───────────────────────────────────────────────────────────────
+function updateInfoBar(){
+  const th = S.angleDeg * Math.PI / 180;
+  const acc = (S.mode==='ideal') ? g*Math.sin(th) : Math.max(0, g*Math.sin(th)-S.mu*g*Math.cos(th));
+  const tTheory = Math.sqrt(2*S.L/acc);
+  document.getElementById('infoL').textContent = S.L.toFixed(1)+' m';
+  document.getElementById('infoA').textContent = S.angleDeg+'°';
+  document.getElementById('infoTT').textContent = tTheory.toFixed(3)+' s';
+  document.getElementById('infoAcc').textContent = acc.toFixed(3)+' m/s²';
+  document.getElementById('infoTH').textContent = S.tHeavy !== null ? S.tHeavy.toFixed(3)+' s' : '—';
+  document.getElementById('infoTL').textContent = S.tLight !== null ? S.tLight.toFixed(3)+' s' : '—';
+}
+
+// ── DATA ───────────────────────────────────────────────────────────────────
+function recordRun(){
+  if(!S.doneHeavy || !S.doneLight){ alert('Wait for both objects to finish!'); return; }
+  const t = S.tHeavy; // use heavy object time (they're ~equal in ideal)
+  dataRows.push({
+    n: dataRows.length+1,
+    L: S.L, ang: S.angleDeg,
+    t: +t.toFixed(4), t2: +(t*t).toFixed(5),
+    mode: S.mode
+  });
+  renderTable();
+}
+
+function renderTable(){
+  document.getElementById('emptyState').style.display='none';
+  const tbl = document.getElementById('dataTable'); tbl.style.display='table';
+  const body = document.getElementById('dataBody'); body.innerHTML='';
+  dataRows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML=`<td>${r.n}</td><td>${r.L.toFixed(1)}</td><td>${r.ang}</td><td>${r.t.toFixed(3)}</td><td>${r.t2.toFixed(4)}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function clearData(){
+  dataRows=[];
+  document.getElementById('emptyState').style.display='block';
+  document.getElementById('dataTable').style.display='none';
+  document.getElementById('graphCanvas').style.display='none';
+}
+
+function downloadCSV(){
+  if(!dataRows.length){ alert('No data yet.'); return; }
+  let csv='Run,L (m),Angle (°),t (s),t² (s²),Mode\n';
+  dataRows.forEach(r => csv+=`${r.n},${r.L},${r.ang},${r.t},${r.t2},${r.mode}\n`);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='galileo_ramp_data.csv'; a.click();
+}
+
+// ── GRAPH ──────────────────────────────────────────────────────────────────
+function showGraph(){
+  if(dataRows.length < 2){ alert('Need at least 2 data points.'); return; }
+  const gc = document.getElementById('graphCanvas');
+  gc.style.display='block';
+  requestAnimationFrame(()=>{
+    gc.width = gc.offsetWidth || 760;
+    drawGraph();
+    gc.scrollIntoView({behavior:'smooth', block:'nearest'});
+  });
+}
+
+function drawGraph(){
+  const gc = document.getElementById('graphCanvas');
+  const g2 = gc.getContext('2d');
+  const GW=gc.width, GH=gc.height;
+  g2.clearRect(0,0,GW,GH);
+  const pad={l:68,r:36,t:44,b:54};
+  const pw=GW-pad.l-pad.r, ph=GH-pad.t-pad.b;
+  g2.fillStyle='#0a0c12'; g2.fillRect(0,0,GW,GH);
+
+  const Lv  = dataRows.map(r=>r.L);
+  const T2v = dataRows.map(r=>r.t2);
+  const maxL  = Math.max(...Lv)*1.25;
+  const maxT2 = Math.max(...T2v)*1.25;
+  const tx = L  => pad.l + L/maxL*pw;
+  const ty = t2 => pad.t + ph - t2/maxT2*ph;
+
+  // Grid
+  g2.strokeStyle='rgba(255,255,255,0.04)'; g2.lineWidth=1;
+  for(let i=1;i<=4;i++){
+    g2.beginPath(); g2.moveTo(pad.l, pad.t+ph/4*i); g2.lineTo(pad.l+pw, pad.t+ph/4*i); g2.stroke();
+    g2.beginPath(); g2.moveTo(pad.l+pw/4*i, pad.t); g2.lineTo(pad.l+pw/4*i, pad.t+ph); g2.stroke();
+  }
+
+  // Axes
+  g2.strokeStyle='#3a4a6a'; g2.lineWidth=1.5;
+  g2.beginPath(); g2.moveTo(pad.l,pad.t); g2.lineTo(pad.l,pad.t+ph); g2.lineTo(pad.l+pw,pad.t+ph); g2.stroke();
+
+  // Theory line: t² = 2L / (g·sinθ) — use average angle from data
+  const avgAng = dataRows.reduce((s,r)=>s+r.ang,0)/dataRows.length * Math.PI/180;
+  const aTheory = g * Math.sin(avgAng);
+  g2.save(); g2.strokeStyle='rgba(77,240,176,0.25)'; g2.lineWidth=1; g2.setLineDash([4,6]);
+  g2.beginPath(); g2.moveTo(tx(0),ty(0)); g2.lineTo(tx(maxL), ty(2*maxL/aTheory)); g2.stroke();
+  g2.restore();
+
+  // Best fit line (linear regression through origin or not)
+  const n = dataRows.length;
+  const sL  = Lv.reduce((a,b)=>a+b,0);
+  const sT2 = T2v.reduce((a,b)=>a+b,0);
+  const sLL = Lv.reduce((a,b)=>a+b*b,0);
+  const sLT = Lv.reduce((a,b,i)=>a+b*T2v[i],0);
+  const slope = (n*sLT - sL*sT2)/(n*sLL - sL*sL);
+  const inter = (sT2 - slope*sL)/n;
+  const gExp  = 2/slope * (1/Math.sin(avgAng));  // from t²=2L/(g·sinθ) → g = 2/(slope·sinθ)
+
+  g2.save(); g2.strokeStyle='rgba(255,209,102,0.55)'; g2.lineWidth=1.5; g2.setLineDash([6,5]);
+  g2.beginPath(); g2.moveTo(tx(0),ty(inter)); g2.lineTo(tx(maxL),ty(slope*maxL+inter)); g2.stroke();
+  g2.restore();
+
+  // Data points
+  dataRows.forEach(r=>{
+    g2.beginPath(); g2.arc(tx(r.L),ty(r.t2),5,0,Math.PI*2);
+    g2.fillStyle='#ffd166'; g2.shadowColor='#ffd16644'; g2.shadowBlur=9; g2.fill(); g2.shadowBlur=0;
+    g2.strokeStyle='#b08010'; g2.lineWidth=1; g2.stroke();
+  });
+
+  // Labels
+  g2.fillStyle='#7a8aaa'; g2.font='11px DM Mono, monospace'; g2.textAlign='center';
+  g2.fillText('L (m)', pad.l+pw/2, GH-10);
+  g2.save(); g2.translate(14,pad.t+ph/2); g2.rotate(-Math.PI/2);
+  g2.fillText('t² (s²)',0,0); g2.restore();
+
+  [0,.25,.5,.75,1].forEach(f=>{
+    const v=maxT2*f; g2.textAlign='right'; g2.fillText(v.toFixed(2),pad.l-7,ty(v)+4);
+    if(f>0){ g2.textAlign='center'; g2.fillText((maxL*f).toFixed(2),tx(maxL*f),pad.t+ph+17); }
+  });
+
+  g2.fillStyle='#eef2ff'; g2.font='600 13px DM Sans, sans-serif'; g2.textAlign='left';
+  g2.fillText('t² vs L', pad.l, pad.t-16);
+  g2.fillStyle='#4df0b0'; g2.font='11px DM Mono, monospace'; g2.textAlign='right';
+  g2.fillText(`gradient = ${slope.toFixed(3)} s²/m   →   g ≈ ${gExp.toFixed(2)} m/s²`, GW-pad.r, pad.t-16);
+
+  // Legend
+  g2.textAlign='left';
+  g2.strokeStyle='rgba(77,240,176,0.4)'; g2.lineWidth=1; g2.setLineDash([4,5]);
+  g2.beginPath(); g2.moveTo(pad.l+4, pad.t+14); g2.lineTo(pad.l+28, pad.t+14); g2.stroke(); g2.setLineDash([]);
+  g2.fillStyle='rgba(77,240,176,0.6)'; g2.font='10px DM Mono, monospace';
+  g2.fillText('theory', pad.l+32, pad.t+17);
+  g2.strokeStyle='rgba(255,209,102,0.55)'; g2.lineWidth=1.5; g2.setLineDash([5,4]);
+  g2.beginPath(); g2.moveTo(pad.l+80, pad.t+14); g2.lineTo(pad.l+104, pad.t+14); g2.stroke(); g2.setLineDash([]);
+  g2.fillStyle='rgba(255,209,102,0.7)';
+  g2.fillText('best fit', pad.l+108, pad.t+17);
+}
+
+// ── AI ─────────────────────────────────────────────────────────────────────
+function saveKey(){
+  apiKey = document.getElementById('apiKey').value.trim();
+  if(apiKey) document.getElementById('aiBox').innerHTML=
+    `<span class="ai-tag">▸ Physics Guide</span>API key saved! Click a question below for an explanation.`;
+}
+
+const prompts = {
+  mass_result: `A secondary student is using a Galileo ramp simulation. They just saw that a heavy iron ball (5 kg) and a light ping-pong ball (0.003 kg) reached the bottom of a frictionless ramp at the exact same time. Explain why in 3–4 sentences, mentioning that acceleration = g·sinθ and that mass cancels out of Newton's second law. Be friendly and clear.`,
+  t_squared: `A student recorded the time t for an object to slide down ramps of different lengths L on a frictionless ramp. They noticed that t² is proportional to L (a straight line on a t² vs L graph). Explain why using the kinematic equation s = ½at² in 3–4 sentences. Mention that the gradient of the t²-L graph equals 2/(g·sinθ), which can be used to find g.`,
+  friction_effect: `A student is comparing ideal (frictionless) vs lab mode (with friction μ) on a ramp simulation. Explain in 3–4 sentences why friction slows both objects nearly equally regardless of mass. Hint: both friction force and inertia scale with mass, so mass still cancels — the effect on time is controlled by μ·cosθ vs sinθ.`,
+  galileo_history: `A student asks about what Galileo actually discovered about falling objects. In 3–4 friendly sentences, describe his legendary (possibly apocryphal) Tower of Pisa experiment, how he used inclined planes to slow down free fall, and how he showed that all objects fall at the same rate regardless of mass — overturning 2000 years of Aristotle's teaching.`,
+};
+
+async function askAI(key){
+  const box = document.getElementById('aiBox');
+  if(!apiKey){ box.innerHTML=`<span class="ai-tag">▸ Physics Guide</span><em style="color:var(--text-dim)">Please save an Anthropic API key first.</em>`; return; }
+  box.innerHTML=`<span class="ai-tag">▸ Physics Guide</span><em style="color:var(--text-dim)">Thinking…</em>`;
+  box.classList.add('lit');
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:350,messages:[{role:'user',content:prompts[key]}]})
+    });
+    const d = await res.json();
+    box.innerHTML=`<span class="ai-tag">▸ Physics Guide</span>${d.content?.[0]?.text||'No response.'}`;
+  }catch(err){
+    box.innerHTML=`<span class="ai-tag">▸ Physics Guide</span><em style="color:var(--red)">Error: ${err.message}</em>`;
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+updateParams();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
