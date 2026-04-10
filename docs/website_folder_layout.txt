@@ -1,0 +1,21 @@
+inquisitivephysics.github.io/
+│
+├── index.html                    ← landing page
+├── mechanics.html                ← mechanics module
+│
+├── js/                           ← SHARED across all sims
+│   ├── physics.js
+│   ├── draw-hook.js
+│   ├── draw-ramp.js
+│   ├── draw-drop.js
+│   ├── draw-history.js
+│   ├── history-data.js
+│   ├── data-logger.js
+│   └── stage-manager.js
+│
+├── galileo-lab/
+│   └── index.html                ← loads ../../js/*.js
+│
+└── pendulum/
+    └── index.html                ← loads ../../js/physics.js
+                                     (only what it needs)

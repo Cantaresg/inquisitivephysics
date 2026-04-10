@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InquisitivePhysics — Discover. Question. Understand.</title>
+<meta name="description" content="Interactive physics simulations for O-Level students. Discover concepts through experimentation, not memorisation. Built for Singapore classrooms.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ── RESET & ROOT ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #07090f;
+  --surface:   #0d1018;
+  --surface2:  #111520;
+  --border:    #1e2535;
+  --border2:   #263045;
+  --accent:    #4df0b0;
+  --accent2:   #38d49a;
+  --gold:      #ffd166;
+  --purple:    #c77dff;
+  --red:       #ff6b6b;
+  --blue:      #4d9fff;
+  --text:      #eef2ff;
+  --text-mid:  #a8b4d0;
+  --text-dim:  #5a6882;
+  --glow:      rgba(77,240,176,0.15);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ── NAVBAR ───────────────────────────────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center;
+  padding: 0 48px; height: 60px;
+  background: rgba(7,9,15,0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.25rem; color: var(--text);
+  text-decoration: none; letter-spacing: -0.01em;
+}
+.nav-logo span { color: var(--accent); }
+
+.nav-links {
+  display: flex; align-items: center; gap: 36px;
+  margin-left: auto; list-style: none;
+}
+.nav-links a {
+  font-size: 0.82rem; font-weight: 500;
+  color: var(--text-mid); text-decoration: none;
+  letter-spacing: 0.03em; transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+
+.nav-cta {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem; font-weight: 500;
+  padding: 6px 16px; border-radius: 6px;
+  border: 1px solid var(--accent);
+  color: var(--accent) !important;
+  letter-spacing: 0.06em;
+  transition: background 0.2s !important;
+}
+.nav-cta:hover { background: var(--glow) !important; color: var(--accent) !important; }
+
+/* ── HERO ─────────────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex; align-items: center;
+  padding: 120px 48px 80px;
+  overflow: hidden;
+}
+
+/* Physics particle field — pure CSS */
+.particle-field {
+  position: absolute; inset: 0;
+  pointer-events: none; overflow: hidden;
+}
+
+/* Orbiting electrons around nuclei */
+.nucleus {
+  position: absolute;
+  border-radius: 50%;
+}
+.nucleus::before {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 20px var(--accent), 0 0 60px rgba(77,240,176,0.3);
+}
+
+.n1 { top: 20%; left: 15%; }
+.n1::before { width: 8px; height: 8px; top: -4px; left: -4px; }
+
+.n2 { top: 60%; right: 20%; }
+.n2::before { width: 6px; height: 6px; top: -3px; left: -3px; background: var(--gold);
+  box-shadow: 0 0 14px var(--gold), 0 0 40px rgba(255,209,102,0.3); }
+
+.n3 { top: 75%; left: 35%; }
+.n3::before { width: 5px; height: 5px; top: -2.5px; left: -2.5px; background: var(--purple);
+  box-shadow: 0 0 12px var(--purple), 0 0 36px rgba(199,125,255,0.3); }
+
+/* Orbital rings */
+.orbit {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(77,240,176,0.12);
+  transform-origin: center;
+}
+.orbit::after {
+  content: '';
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  top: -3px; left: 50%;
+  transform: translateX(-50%);
+}
+
+.o1 { width: 120px; height: 120px; top: calc(20% - 60px); left: calc(15% - 60px);
+  animation: orbit1 6s linear infinite; }
+.o2 { width: 180px; height: 70px; top: calc(20% - 35px); left: calc(15% - 90px);
+  border-color: rgba(77,240,176,0.08);
+  animation: orbit2 9s linear infinite; }
+  .o2::after { background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+
+.o3 { width: 100px; height: 100px; top: calc(60% - 50px); right: calc(20% - 50px);
+  border-color: rgba(255,209,102,0.12);
+  animation: orbit1 8s linear infinite reverse; }
+  .o3::after { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+
+.o4 { width: 80px; height: 80px; top: calc(75% - 40px); left: calc(35% - 40px);
+  border-color: rgba(199,125,255,0.12);
+  animation: orbit2 7s linear infinite; }
+  .o4::after { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
+
+@keyframes orbit1 { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes orbit2 { from { transform: rotate(0deg) scaleY(0.4); } to { transform: rotate(360deg) scaleY(0.4); } }
+
+/* Trajectory arcs — ballistic paths */
+.arc {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(77,240,176,0.08);
+  pointer-events: none;
+}
+.arc1 { width: 600px; height: 300px; bottom: 10%; left: -100px;
+  border-color: rgba(255,209,102,0.07); transform: rotate(-15deg); }
+.arc2 { width: 400px; height: 200px; top: 30%; right: -80px;
+  border-color: rgba(77,240,176,0.06); transform: rotate(20deg); }
+
+/* Moving projectile along arc */
+.projectile {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 12px var(--gold), 0 0 30px rgba(255,209,102,0.4);
+  offset-path: path('M -100,400 Q 200,100 700,300');
+  animation: fly 8s ease-in-out infinite;
+}
+.projectile2 {
+  position: absolute;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  offset-path: path('M 800,200 Q 600,50 300,250');
+  animation: fly 11s ease-in-out infinite 3s;
+}
+
+@keyframes fly {
+  0%   { offset-distance: 0%;   opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+/* Grid overlay — scientific graph paper feel */
+.grid-overlay {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+}
+
+/* Gradient vignette */
+.hero-vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 70% at 70% 50%,
+    transparent 0%, rgba(7,9,15,0.6) 60%, var(--bg) 100%);
+}
+
+/* Hero content */
+.hero-content {
+  position: relative; z-index: 2;
+  max-width: 640px;
+}
+
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem; letter-spacing: 0.14em;
+  color: var(--accent); text-transform: uppercase;
+  margin-bottom: 24px;
+  opacity: 0; animation: fadeUp 0.8s ease 0.2s forwards;
+}
+.hero-eyebrow::before {
+  content: ''; display: block;
+  width: 28px; height: 1px; background: var(--accent);
+}
+
+.hero-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(2.8rem, 5vw, 4.2rem);
+  line-height: 1.1; letter-spacing: -0.02em;
+  color: var(--text); margin-bottom: 8px;
+  opacity: 0; animation: fadeUp 0.8s ease 0.4s forwards;
+}
+.hero-title em {
+  font-style: italic; color: var(--accent);
+}
+
+.hero-subtitle {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(1.4rem, 2.5vw, 1.9rem);
+  line-height: 1.2; letter-spacing: -0.01em;
+  color: var(--text-mid); margin-bottom: 28px;
+  opacity: 0; animation: fadeUp 0.8s ease 0.55s forwards;
+}
+
+.hero-body {
+  font-size: 1rem; line-height: 1.75;
+  color: var(--text-mid); max-width: 480px;
+  margin-bottom: 40px;
+  opacity: 0; animation: fadeUp 0.8s ease 0.7s forwards;
+}
+.hero-body strong { color: var(--text); font-weight: 600; }
+
+.hero-actions {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  opacity: 0; animation: fadeUp 0.8s ease 0.85s forwards;
+}
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 600;
+  padding: 14px 28px; border-radius: 10px;
+  background: var(--accent); color: #050a0a;
+  text-decoration: none; border: none; cursor: pointer;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 0 0 0 rgba(77,240,176,0.4);
+}
+.btn-primary:hover {
+  background: var(--accent2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(77,240,176,0.25);
+}
+.btn-primary svg { transition: transform 0.2s; }
+.btn-primary:hover svg { transform: translateX(4px); }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.85rem; font-weight: 500;
+  padding: 14px 24px; border-radius: 10px;
+  border: 1.5px solid var(--border2);
+  color: var(--text-mid); text-decoration: none;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.btn-secondary:hover {
+  border-color: var(--text-mid); color: var(--text);
+  background: rgba(255,255,255,0.04);
+}
+
+/* Scroll indicator */
+.scroll-hint {
+  position: absolute; bottom: 36px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  opacity: 0; animation: fadeIn 1s ease 1.5s forwards;
+  z-index: 2;
+}
+.scroll-hint span {
+  font-family: 'DM Mono', monospace; font-size: 0.6rem;
+  letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase;
+}
+.scroll-line {
+  width: 1px; height: 40px;
+  background: linear-gradient(to bottom, var(--border2), transparent);
+  animation: scrollPulse 2s ease infinite 1.5s;
+}
+@keyframes scrollPulse {
+  0%, 100% { opacity: 0.4; transform: scaleY(1); }
+  50%       { opacity: 1;   transform: scaleY(1.2); }
+}
+
+/* ── SECTION SHARED ───────────────────────────────────────────────────────── */
+section { padding: 96px 48px; }
+
+.section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent);
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+}
+.section-label::before {
+  content: ''; width: 24px; height: 1px; background: var(--accent);
+}
+
+.section-heading {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  line-height: 1.15; letter-spacing: -0.02em;
+  color: var(--text); margin-bottom: 16px;
+}
+
+.section-sub {
+  font-size: 1rem; color: var(--text-mid);
+  max-width: 560px; line-height: 1.75;
+  margin-bottom: 56px;
+}
+
+/* ── SUBJECTS SECTION ─────────────────────────────────────────────────────── */
+.subjects { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+.subjects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.subject-card {
+  position: relative; overflow: hidden;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 14px; padding: 28px;
+  text-decoration: none; color: inherit;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.subject-card:hover {
+  border-color: var(--border2);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+}
+.subject-card.active:hover { border-color: var(--card-accent, var(--accent)); }
+
+.subject-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--card-accent, transparent);
+  opacity: 0; transition: opacity 0.2s;
+}
+.subject-card:hover::before { opacity: 1; }
+
+.subject-card.active { cursor: pointer; }
+.subject-card.soon { cursor: default; }
+.subject-card.soon:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+.card-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.04); font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+
+.card-badge {
+  font-family: 'DM Mono', monospace; font-size: 0.58rem;
+  letter-spacing: 0.1em; padding: 3px 9px; border-radius: 20px;
+  flex-shrink: 0; margin-top: 2px;
+}
+.badge-live { background: rgba(77,240,176,0.12); color: var(--accent); border: 1px solid rgba(77,240,176,0.25); }
+.badge-soon { background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid var(--border); }
+
+.card-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.2rem; color: var(--text); line-height: 1.2;
+}
+
+.card-desc {
+  font-size: 0.82rem; color: var(--text-mid);
+  line-height: 1.65; flex: 1;
+}
+
+.card-sims {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+}
+.sim-chip {
+  font-family: 'DM Mono', monospace; font-size: 0.62rem;
+  padding: 3px 10px; border-radius: 20px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border2);
+  color: var(--text-dim);
+}
+.subject-card.active .sim-chip {
+  background: rgba(77,240,176,0.06);
+  border-color: rgba(77,240,176,0.18);
+  color: var(--accent);
+}
+
+.card-arrow {
+  margin-top: 8px; font-size: 0.8rem; color: var(--text-dim);
+  display: flex; align-items: center; gap: 6px;
+  transition: color 0.2s, gap 0.2s;
+}
+.subject-card:hover .card-arrow { color: var(--card-accent, var(--accent)); gap: 10px; }
+
+/* ── HOW IT WORKS ─────────────────────────────────────────────────────────── */
+.how { background: var(--bg); }
+.how-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+}
+.how-step {
+  background: var(--surface); padding: 32px 28px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.step-num {
+  font-family: 'DM Mono', monospace; font-size: 0.62rem;
+  letter-spacing: 0.12em; color: var(--text-dim);
+}
+.step-icon { font-size: 1.6rem; }
+.step-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.1rem; color: var(--text); line-height: 1.2;
+}
+.step-desc { font-size: 0.82rem; color: var(--text-mid); line-height: 1.65; }
+
+/* ── PHILOSOPHY STRIP ─────────────────────────────────────────────────────── */
+.philosophy {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 64px 48px;
+}
+.phil-inner {
+  max-width: 800px; margin: 0 auto; text-align: center;
+}
+.phil-quote {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  line-height: 1.5; color: var(--text);
+  margin-bottom: 20px;
+}
+.phil-quote em { color: var(--accent); font-style: italic; }
+.phil-attr {
+  font-family: 'DM Mono', monospace; font-size: 0.68rem;
+  letter-spacing: 0.1em; color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* ── FOR TEACHERS ─────────────────────────────────────────────────────────── */
+.teachers { background: var(--bg); }
+.teachers-inner {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
+  align-items: start;
+}
+
+.teacher-features { display: flex; flex-direction: column; gap: 28px; }
+.tf {
+  display: flex; gap: 18px; align-items: flex-start;
+  padding: 20px; border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.2s;
+}
+.tf:hover { border-color: var(--border2); }
+.tf-icon {
+  width: 38px; height: 38px; border-radius: 8px;
+  background: var(--glow); border: 1px solid rgba(77,240,176,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.tf-title { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.tf-desc { font-size: 0.8rem; color: var(--text-mid); line-height: 1.6; }
+
+.teacher-aside {
+  position: sticky; top: 80px;
+}
+.aside-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 32px;
+}
+.aside-card .section-label { margin-bottom: 20px; }
+.aside-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.4rem; color: var(--text); margin-bottom: 12px; line-height: 1.3;
+}
+.aside-body { font-size: 0.84rem; color: var(--text-mid); line-height: 1.7; margin-bottom: 24px; }
+
+.curriculum-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+.ctag {
+  font-family: 'DM Mono', monospace; font-size: 0.62rem;
+  padding: 4px 12px; border-radius: 20px; letter-spacing: 0.05em;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border2);
+  color: var(--text-mid);
+}
+
+/* ── CONTACT / FEEDBACK ───────────────────────────────────────────────────── */
+.contact-strip {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 48px;
+  text-align: center;
+}
+.contact-inner { max-width: 520px; margin: 0 auto; }
+.contact-strip h3 {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.4rem; color: var(--text); margin-bottom: 10px;
+}
+.contact-strip p { font-size: 0.88rem; color: var(--text-mid); margin-bottom: 24px; line-height: 1.7; }
+.contact-links { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+
+.contact-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.82rem; font-weight: 500;
+  padding: 10px 20px; border-radius: 8px;
+  border: 1.5px solid var(--border2);
+  color: var(--text-mid); text-decoration: none;
+  transition: all 0.2s;
+}
+.contact-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--glow); }
+
+/* ── FOOTER ───────────────────────────────────────────────────────────────── */
+footer {
+  background: var(--bg); border-top: 1px solid var(--border);
+  padding: 32px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 16px;
+}
+.footer-logo {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1rem; color: var(--text-mid); text-decoration: none;
+}
+.footer-logo span { color: var(--accent); }
+.footer-copy {
+  font-family: 'DM Mono', monospace; font-size: 0.62rem;
+  color: var(--text-dim); letter-spacing: 0.06em;
+}
+.footer-links { display: flex; gap: 24px; }
+.footer-links a {
+  font-size: 0.78rem; color: var(--text-dim);
+  text-decoration: none; transition: color 0.2s;
+}
+.footer-links a:hover { color: var(--text-mid); }
+
+/* ── ANIMATIONS ───────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Scroll-reveal utility */
+.reveal {
+  opacity: 0; transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+
+/* ── RESPONSIVE ───────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  nav { padding: 0 24px; }
+  .nav-links { gap: 20px; }
+  section { padding: 72px 24px; }
+  .hero { padding: 100px 24px 72px; }
+  .teachers-inner { grid-template-columns: 1fr; gap: 40px; }
+  .teacher-aside { position: static; }
+  footer { padding: 24px; }
+  .contact-strip { padding: 48px 24px; }
+  .philosophy { padding: 48px 24px; }
+}
+
+@media (max-width: 600px) {
+  .nav-links li:not(:last-child) { display: none; }
+  .hero-actions { flex-direction: column; align-items: flex-start; }
+  .how-grid { grid-template-columns: 1fr; }
+  footer { flex-direction: column; text-align: center; }
+  .footer-links { justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── NAVBAR ──────────────────────────────────────────────────────────────── -->
+<nav>
+  <a href="#" class="nav-logo">Inquisitive<span>Physics</span></a>
+  <ul class="nav-links">
+    <li><a href="#subjects">Simulations</a></li>
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#teachers">For Teachers</a></li>
+    <li><a href="#contact" class="nav-cta">FEEDBACK</a></li>
+  </ul>
+</nav>
+
+<!-- ── HERO ────────────────────────────────────────────────────────────────── -->
+<section class="hero">
+
+  <!-- Particle field background -->
+  <div class="particle-field">
+    <div class="grid-overlay"></div>
+
+    <!-- Nuclei -->
+    <div class="nucleus n1"></div>
+    <div class="nucleus n2"></div>
+    <div class="nucleus n3"></div>
+
+    <!-- Orbital rings -->
+    <div class="orbit o1"></div>
+    <div class="orbit o2"></div>
+    <div class="orbit o3"></div>
+    <div class="orbit o4"></div>
+
+    <!-- Trajectory arcs -->
+    <div class="arc arc1"></div>
+    <div class="arc arc2"></div>
+
+    <!-- Moving projectiles -->
+    <div class="projectile"></div>
+    <div class="projectile2"></div>
+
+    <div class="hero-vignette"></div>
+  </div>
+
+  <div class="hero-content">
+      <div class="hero-eyebrow">Interactive physics simulations</div>
+    <h1 class="hero-title">
+      Physics you<br><em>discover</em> yourself.
+    </h1>
+
+    <p class="hero-subtitle">
+      Not physics you're told about.
+    </p>
+
+    <p class="hero-body">
+      Every simulation here starts with a question — and lets you find the answer through experimentation.
+      <strong>Predict. Experiment. Be surprised. Understand.</strong>
+      The way science actually works.
+    </p>
+
+    <div class="hero-actions">
+      <a href="#subjects" class="btn-primary">
+        Start Experimenting
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <a href="#teachers" class="btn-secondary">
+        Teacher Information →
+      </a>
+    </div>
+  </div>
+
+  <div class="scroll-hint">
+    <span>Explore</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- ── SUBJECTS ─────────────────────────────────────────────────────────────── -->
+<section class="subjects" id="subjects">
+  <div class="section-label">Simulations</div>
+  <h2 class="section-heading reveal">Choose a topic to explore.</h2>
+  <p class="section-sub reveal reveal-delay-1">
+    Each module is a guided investigation — not a demonstration. You form hypotheses, run experiments, and arrive at the physics yourself.
+  </p>
+
+  <div class="subjects-grid">
+
+    <!-- MECHANICS — LIVE -->
+    <a href="mechanics.html" class="subject-card active reveal reveal-delay-1"
+       style="--card-accent: var(--accent);">
+      <div class="card-header">
+        <div class="card-icon">⚙️</div>
+        <span class="card-badge badge-live">LIVE</span>
+      </div>
+      <div class="card-title">Mechanics</div>
+      <p class="card-desc">
+        Investigate forces, motion, and gravity through hands-on experiments. Does mass affect how fast things fall? Does shape matter? Find out.
+      </p>
+      <div class="card-sims">
+        <span class="sim-chip">Galileo Lab</span>
+        <span class="sim-chip">Pendulum</span>
+      </div>
+      <div class="card-arrow">
+        Open module
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </a>
+
+    <!-- LIGHT & OPTICS — SOON -->
+    <div class="subject-card soon reveal reveal-delay-2" style="--card-accent: var(--gold);">
+      <div class="card-header">
+        <div class="card-icon">🔭</div>
+        <span class="card-badge badge-soon">COMING SOON</span>
+      </div>
+      <div class="card-title">Light & Optics</div>
+      <p class="card-desc">
+        Explore reflection, refraction, and the behaviour of lenses. Why does a straw appear bent in water? Experiment your way to the answer.
+      </p>
+      <div class="card-sims">
+        <span class="sim-chip">Ray Tracing</span>
+        <span class="sim-chip">Snell's Law</span>
+        <span class="sim-chip">Lenses</span>
+      </div>
+    </div>
+
+    <!-- WAVES — SOON -->
+    <div class="subject-card soon reveal reveal-delay-3" style="--card-accent: var(--purple);">
+      <div class="card-header">
+        <div class="card-icon">〰️</div>
+        <span class="card-badge badge-soon">COMING SOON</span>
+      </div>
+      <div class="card-title">Waves</div>
+      <p class="card-desc">
+        Investigate wave properties — frequency, wavelength, amplitude — and discover why sounds have different pitches and volumes.
+      </p>
+      <div class="card-sims">
+        <span class="sim-chip">Wave Properties</span>
+        <span class="sim-chip">Sound Waves</span>
+        <span class="sim-chip">Interference</span>
+      </div>
+    </div>
+
+    <!-- HEAT & THERMO — SOON -->
+    <div class="subject-card soon reveal reveal-delay-4" style="--card-accent: var(--red);">
+      <div class="card-header">
+        <div class="card-icon">🌡️</div>
+        <span class="card-badge badge-soon">COMING SOON</span>
+      </div>
+      <div class="card-title">Heat & Thermodynamics</div>
+      <p class="card-desc">
+        Probe thermal energy, heat transfer, and the kinetic model. What does temperature actually measure at the particle level?
+      </p>
+      <div class="card-sims">
+        <span class="sim-chip">Kinetic Theory</span>
+        <span class="sim-chip">Heat Transfer</span>
+        <span class="sim-chip">Gas Laws</span>
+      </div>
+    </div>
+
+    <!-- ELECTRICITY — SOON -->
+    <div class="subject-card soon reveal" style="--card-accent: var(--blue);">
+      <div class="card-header">
+        <div class="card-icon">⚡</div>
+        <span class="card-badge badge-soon">COMING SOON</span>
+      </div>
+      <div class="card-title">Electricity & Magnetism</div>
+      <p class="card-desc">
+        Explore circuits, fields, and electromagnetic induction. Build virtual circuits and see what happens when you change the variables.
+      </p>
+      <div class="card-sims">
+        <span class="sim-chip">Circuit Builder</span>
+        <span class="sim-chip">Electric Fields</span>
+        <span class="sim-chip">Magnetism</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── HOW IT WORKS ─────────────────────────────────────────────────────────── -->
+<section class="how" id="how">
+  <div class="section-label">The Approach</div>
+  <h2 class="section-heading reveal">Built on a simple idea.</h2>
+  <p class="section-sub reveal reveal-delay-1">
+    Students don't remember what they're told. They remember what surprised them. Every module here is designed to create that surprise.
+  </p>
+
+  <div class="how-grid reveal reveal-delay-2">
+    <div class="how-step">
+      <div class="step-num">01</div>
+      <div class="step-icon">🤔</div>
+      <div class="step-title">You make a prediction first.</div>
+      <p class="step-desc">Before any experiment runs, you commit to what you think will happen. This creates the conditions for genuine surprise — and genuine learning.</p>
+    </div>
+    <div class="how-step">
+      <div class="step-num">02</div>
+      <div class="step-icon">⚗️</div>
+      <div class="step-title">The experiment runs.</div>
+      <p class="step-desc">Physics-accurate simulations using real equations — not cartoons. What you see is what would actually happen in a lab, without the setup time.</p>
+    </div>
+    <div class="how-step">
+      <div class="step-num">03</div>
+      <div class="step-icon">💡</div>
+      <div class="step-title">You explain what you saw.</div>
+      <p class="step-desc">Observation questions push you to articulate the physics in your own words. The sim doesn't tell you the answer — you construct it yourself.</p>
+    </div>
+    <div class="how-step">
+      <div class="step-num">04</div>
+      <div class="step-icon">📊</div>
+      <div class="step-title">Data tells the deeper story.</div>
+      <p class="step-desc">Collect measurements, spot patterns, graph relationships. The same method Galileo used 400 years ago — and still how science works today.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── PHILOSOPHY STRIP ──────────────────────────────────────────────────────── -->
+<div class="philosophy">
+  <div class="phil-inner">
+    <p class="phil-quote reveal">
+      "Tell me and I forget. Teach me and I remember.
+      <em>Involve me and I learn.</em>"
+    </p>
+    <p class="phil-attr reveal reveal-delay-1">Benjamin Franklin · The principle behind every simulation here</p>
+  </div>
+</div>
+
+<!-- ── FOR TEACHERS ──────────────────────────────────────────────────────────── -->
+<section class="teachers" id="teachers">
+  <div class="teachers-inner">
+    <div>
+      <div class="section-label">For Teachers</div>
+      <h2 class="section-heading reveal">Designed for the classroom.</h2>
+      <p class="section-sub reveal reveal-delay-1">
+        Each simulation is a complete lesson arc — with a pedagogical rationale, teacher notes, and student response collection built in.
+      </p>
+
+      <div class="teacher-features">
+        <div class="tf reveal reveal-delay-1">
+          <div class="tf-icon">🎯</div>
+          <div>
+            <div class="tf-title">Misconception-first sequencing</div>
+            <p class="tf-desc">Every module is designed to activate a common student misconception before correcting it. Students who are wrong first remember the correction longer.</p>
+          </div>
+        </div>
+        <div class="tf reveal reveal-delay-2">
+          <div class="tf-icon">📋</div>
+          <div>
+            <div class="tf-title">Student response collection</div>
+            <p class="tf-desc">Predictions and observations are captured automatically. Connect to Google Sheets via a one-time setup and see every student's reasoning in real time.</p>
+          </div>
+        </div>
+        <div class="tf reveal reveal-delay-3">
+          <div class="tf-icon">🔒</div>
+          <div>
+            <div class="tf-title">Anti-copying by design</div>
+            <p class="tf-desc">MCQ questions are drawn differently for each student alias using a seeded algorithm. Same questions — different options shown. Copying doesn't help.</p>
+          </div>
+        </div>
+        <div class="tf reveal reveal-delay-4">
+          <div class="tf-icon">⚡</div>
+          <div>
+            <div class="tf-title">Zero installation required</div>
+            <p class="tf-desc">Runs in any modern browser. No app, no login, no IT department required. Share a link and the lesson is ready.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="teacher-aside">
+      <div class="aside-card reveal">
+        <div class="section-label">Curriculum Alignment</div>
+        <h3 class="aside-title">Suitable for Y9 / GCE O-Level</h3>
+        <p class="aside-body">
+          Simulations are designed for secondary physics learners, with the current module aligning to O-Level topics. High-school / JC content can be added on the same page as the lab collection grows.
+        </p>
+        <div class="curriculum-tags">
+          <span class="ctag">Measurement</span>
+          <span class="ctag">Kinematics</span>
+          <span class="ctag">Dynamics</span>
+          <span class="ctag">Forces</span>
+          <span class="ctag">Pressure</span>
+          <span class="ctag">Energy</span>
+          <span class="ctag">Thermal Physics</span>
+          <span class="ctag">Waves</span>
+          <span class="ctag">Light</span>
+          <span class="ctag">Electricity</span>
+        </div>
+        <a href="#contact" class="btn-primary" style="font-size:0.84rem; padding:11px 22px;">
+          Request Teacher Guide →
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CONTACT ───────────────────────────────────────────────────────────────── -->
+<div class="contact-strip" id="contact">
+  <div class="contact-inner">
+    <h3>Feedback, bugs, or ideas?</h3>
+    <p>
+      This project is actively being built. If something doesn't work, if a physics explanation seems off,
+      or if you have ideas for new simulations — please reach out. Every message is read.
+    </p>
+    <div class="contact-links">
+      <a href="mailto:your@email.com" class="contact-btn">
+        ✉️ Send Feedback
+      </a>
+      <a href="https://github.com/Cantaresg/physics_math_sim/issues" target="_blank" class="contact-btn">
+        🐛 Report a Bug
+      </a>
+      <a href="https://github.com/Cantaresg/physics_math_sim" target="_blank" class="contact-btn">
+        ⭐ View on GitHub
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ── FOOTER ────────────────────────────────────────────────────────────────── -->
+<footer>
+  <a href="#" class="footer-logo">Inquisitive<span>Physics</span></a>
+  <div class="footer-links">
+    <a href="#subjects">Simulations</a>
+    <a href="#teachers">Teachers</a>
+    <a href="#contact">Contact</a>
+    <a href="https://github.com/Cantaresg/physics_math_sim" target="_blank">GitHub</a>
+  </div>
+  <div class="footer-copy">Built for curious minds · Singapore</div>
+</footer>
+
+<!-- ── SCROLL REVEAL ──────────────────────────────────────────────────────────── -->
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12 });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Smooth scroll for nav links
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+
+</body>
+</html>

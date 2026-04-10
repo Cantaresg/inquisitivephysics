@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mechanics — InquisitivePhysics</title>
+<meta name="description" content="Explore mechanics through guided experiments. Kinematics, forces, energy, pressure — discover the physics yourself.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#07090f; --surface:#0d1018; --surface2:#111520;
+  --border:#1e2535; --border2:#263045;
+  --accent:#4df0b0; --accent2:#38d49a;
+  --gold:#ffd166; --purple:#c77dff; --red:#ff6b6b; --blue:#4d9fff;
+  --text:#eef2ff; --text-mid:#a8b4d0; --text-dim:#5a6882;
+  --glow:rgba(77,240,176,0.12);
+}
+html { scroll-behavior: smooth; }
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; line-height:1.6; overflow-x:hidden; min-height:100vh; }
+
+/* NAV */
+nav { position:fixed; top:0; left:0; right:0; z-index:100; display:flex; align-items:center; padding:0 48px; height:60px; background:rgba(7,9,15,0.9); backdrop-filter:blur(16px); border-bottom:1px solid var(--border); gap:16px; }
+.nav-logo { font-family:'Instrument Serif',serif; font-size:1.15rem; color:var(--text); text-decoration:none; }
+.nav-logo span { color:var(--accent); }
+.nav-crumb { display:flex; align-items:center; gap:8px; font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--text-dim); }
+.nav-crumb .sep { color:var(--border2); }
+.nav-crumb .cur { color:var(--accent); }
+.nav-links { display:flex; align-items:center; gap:28px; margin-left:auto; list-style:none; }
+.nav-links a { font-size:0.8rem; font-weight:500; color:var(--text-dim); text-decoration:none; transition:color 0.2s; }
+.nav-links a:hover { color:var(--text); }
+.nav-cta { font-family:'DM Mono',monospace; font-size:0.68rem; padding:5px 14px; border-radius:6px; border:1px solid var(--accent); color:var(--accent)!important; transition:background 0.2s!important; }
+.nav-cta:hover { background:var(--glow)!important; }
+
+/* MODULE HERO */
+.module-hero { padding:120px 48px 64px; border-bottom:1px solid var(--border); position:relative; overflow:hidden; }
+.module-hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 50% 60% at 80% 50%, rgba(77,240,176,0.04) 0%, transparent 70%), linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px); background-size:auto, 60px 60px, 60px 60px; pointer-events:none; }
+.mod-tag { display:inline-flex; align-items:center; gap:8px; font-family:'DM Mono',monospace; font-size:0.65rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent); margin-bottom:20px; opacity:0; animation:fadeUp 0.6s ease 0.1s forwards; }
+.mod-tag::before { content:''; width:24px; height:1px; background:var(--accent); }
+.mod-title { font-family:'Instrument Serif',serif; font-size:clamp(2.4rem,4vw,3.6rem); line-height:1.1; letter-spacing:-0.02em; color:var(--text); margin-bottom:16px; opacity:0; animation:fadeUp 0.6s ease 0.2s forwards; }
+.mod-title em { font-style:italic; color:var(--accent); }
+.mod-desc { font-size:1rem; color:var(--text-mid); max-width:560px; line-height:1.75; margin-bottom:32px; opacity:0; animation:fadeUp 0.6s ease 0.3s forwards; }
+.mod-stats { display:flex; align-items:center; gap:32px; flex-wrap:wrap; opacity:0; animation:fadeUp 0.6s ease 0.4s forwards; }
+.stat { display:flex; flex-direction:column; gap:2px; }
+.stat-val { font-family:'DM Mono',monospace; font-size:1.4rem; font-weight:500; color:var(--accent); line-height:1; }
+.stat-lbl { font-size:0.72rem; color:var(--text-dim); letter-spacing:0.06em; }
+.stat-div { width:1px; height:36px; background:var(--border2); }
+
+/* CHAPTERS WRAP */
+.chapters-wrap { max-width:1100px; margin:0 auto; padding:64px 48px 96px; }
+.chapters-hdr { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:40px; flex-wrap:wrap; gap:12px; }
+.chapters-title { font-family:'Instrument Serif',serif; font-size:1.6rem; color:var(--text); }
+.chapters-hint { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--text-dim); letter-spacing:0.08em; }
+
+/* CHAPTER BLOCK */
+.chapter { margin-bottom:52px; opacity:0; transform:translateY(20px); transition:opacity 0.6s ease, transform 0.6s ease; }
+.chapter.visible { opacity:1; transform:translateY(0); }
+.chapter-hdr { display:flex; align-items:center; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:20px; }
+.ch-num { font-family:'DM Mono',monospace; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-dim); flex-shrink:0; }
+.ch-name { font-family:'Instrument Serif',serif; font-size:1.25rem; color:var(--text); }
+.ch-tags { margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.ch-tag { font-family:'DM Mono',monospace; font-size:0.58rem; padding:2px 9px; border-radius:20px; background:rgba(255,255,255,0.04); border:1px solid var(--border2); color:var(--text-dim); }
+
+/* EMPTY STATE */
+.ch-empty { padding:24px; border:1px dashed var(--border); border-radius:10px; display:flex; align-items:center; gap:16px; }
+.ch-empty-icon { font-size:1.4rem; flex-shrink:0; opacity:0.4; }
+.ch-empty-text { font-size:0.82rem; color:var(--text-dim); line-height:1.6; }
+.ch-empty-text strong { display:block; color:var(--text-mid); font-size:0.85rem; margin-bottom:2px; }
+
+/* SIM CARDS */
+.sim-cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:16px; }
+.sim-card { position:relative; overflow:hidden; background:var(--surface); border:1px solid var(--border); border-radius:14px; text-decoration:none; color:inherit; display:flex; flex-direction:column; transition:border-color 0.2s, transform 0.2s, box-shadow 0.2s; }
+.sim-card:hover { border-color:var(--accent); transform:translateY(-3px); box-shadow:0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(77,240,176,0.1); }
+.sim-preview { width:100%; height:160px; background:var(--bg); border-radius:13px 13px 0 0; overflow:hidden; position:relative; border-bottom:1px solid var(--border); flex-shrink:0; }
+.sim-preview canvas { width:100%; height:100%; display:block; }
+.preview-lbl { position:absolute; bottom:8px; right:10px; font-family:'DM Mono',monospace; font-size:0.58rem; letter-spacing:0.08em; color:rgba(77,240,176,0.45); pointer-events:none; }
+.sim-body { padding:20px 22px 18px; display:flex; flex-direction:column; gap:10px; flex:1; }
+.sim-card-hdr { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.sim-title { font-family:'Instrument Serif',serif; font-size:1.15rem; color:var(--text); line-height:1.2; }
+.sim-badge { font-family:'DM Mono',monospace; font-size:0.56rem; letter-spacing:0.1em; padding:3px 9px; border-radius:20px; flex-shrink:0; margin-top:2px; background:rgba(77,240,176,0.1); color:var(--accent); border:1px solid rgba(77,240,176,0.22); }
+.sim-desc { font-size:0.8rem; color:var(--text-mid); line-height:1.65; flex:1; }
+.sim-concepts { display:flex; flex-wrap:wrap; gap:5px; }
+.concept-chip { font-family:'DM Mono',monospace; font-size:0.58rem; padding:2px 8px; border-radius:20px; background:rgba(77,240,176,0.06); border:1px solid rgba(77,240,176,0.15); color:rgba(77,240,176,0.7); }
+.sim-footer { display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid var(--border); margin-top:4px; }
+.sim-meta { font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--text-dim); }
+.sim-launch { display:flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:600; color:var(--accent); transition:gap 0.2s; }
+.sim-card:hover .sim-launch { gap:10px; }
+.sim-launch svg { transition:transform 0.2s; }
+.sim-card:hover .sim-launch svg { transform:translateX(3px); }
+
+/* FOOTER */
+.page-footer { background:var(--bg); border-top:1px solid var(--border); padding:28px 48px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+.footer-logo { font-family:'Instrument Serif',serif; font-size:1rem; color:var(--text-mid); text-decoration:none; }
+.footer-logo span { color:var(--accent); }
+.footer-copy { font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--text-dim); letter-spacing:0.06em; }
+.footer-links { display:flex; gap:20px; }
+.footer-links a { font-size:0.76rem; color:var(--text-dim); text-decoration:none; transition:color 0.2s; }
+.footer-links a:hover { color:var(--text-mid); }
+
+/* ANIMATIONS */
+@keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+/* RESPONSIVE */
+@media (max-width:860px) {
+  nav { padding:0 20px; }
+  .module-hero { padding:100px 24px 48px; }
+  .chapters-wrap { padding:48px 24px 72px; }
+  .ch-tags { display:none; }
+  .mod-stats { gap:20px; }
+  .page-footer { padding:24px; }
+}
+@media (max-width:560px) {
+  .nav-crumb { display:none; }
+  .sim-cards { grid-template-columns:1fr; }
+  .stat-div { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="../index.html" class="nav-logo">Inquisitive<span>Physics</span></a>
+  <div class="nav-crumb">
+    <span>Simulations</span>
+    <span class="sep">›</span>
+    <span class="cur">Mechanics</span>
+  </div>
+  <ul class="nav-links">
+    <li><a href="../index.html#subjects">All Modules</a></li>
+    <li><a href="../index.html#teachers">For Teachers</a></li>
+    <li><a href="../index.html#contact" class="nav-cta">FEEDBACK</a></li>
+  </ul>
+</nav>
+
+<!-- MODULE HERO -->
+<div class="module-hero">
+  <div class="mod-tag">Mechanics</div>
+  <h1 class="mod-title">How things <em>move</em>,<br>and why.</h1>
+  <p class="mod-desc">
+    From the simplest question — does a heavier object fall faster? — to measuring gravitational acceleration with a pendulum. Mechanics is where physics begins. Every experiment here lets you find the answer yourself.
+  </p>
+  <div class="mod-stats">
+    <div class="stat"><span class="stat-val">2</span><span class="stat-lbl">Live simulations</span></div>
+    <div class="stat-div"></div>
+    <div class="stat"><span class="stat-val">6</span><span class="stat-lbl">Topics covered</span></div>
+    <div class="stat-div"></div>
+    <div class="stat"><span class="stat-val">O-Level</span><span class="stat-lbl">Primary level</span></div>
+    <div class="stat-div"></div>
+    <div class="stat"><span class="stat-val">Free</span><span class="stat-lbl">No login needed</span></div>
+  </div>
+</div>
+
+<!-- CHAPTERS -->
+<div class="chapters-wrap">
+
+  <div class="chapters-hdr">
+    <h2 class="chapters-title">Topics</h2>
+    <span class="chapters-hint">STANDARD SECONDARY PHYSICS SYLLABUS</span>
+  </div>
+
+  <!-- MEASUREMENT -->
+  <div class="chapter" id="ch-measurement">
+    <div class="chapter-hdr">
+      <span class="ch-num">Topic 01</span>
+      <h3 class="ch-name">Measurement & Uncertainty</h3>
+      <div class="ch-tags">
+        <span class="ch-tag">SI units</span>
+        <span class="ch-tag">Significant figures</span>
+        <span class="ch-tag">Precision vs accuracy</span>
+        <span class="ch-tag">Experimental error</span>
+      </div>
+    </div>
+    <div class="ch-empty">
+      <div class="ch-empty-icon">🔬</div>
+      <div class="ch-empty-text">
+        <strong>Simulations coming soon</strong>
+        Measurement labs exploring precision, accuracy, and how timing errors affect experimental results — a natural companion to the Galileo Lab.
+      </div>
+    </div>
+  </div>
+
+  <!-- KINEMATICS — HAS LIVE SIMS -->
+  <div class="chapter" id="ch-kinematics">
+    <div class="chapter-hdr">
+      <span class="ch-num">Topic 02</span>
+      <h3 class="ch-name">Kinematics</h3>
+      <div class="ch-tags">
+        <span class="ch-tag">Free fall</span>
+        <span class="ch-tag">Acceleration</span>
+        <span class="ch-tag">Motion graphs</span>
+        <span class="ch-tag">Periodic motion</span>
+        <span class="ch-tag">Air resistance</span>
+      </div>
+    </div>
+
+    <div class="sim-cards">
+
+      <!-- GALILEO LAB -->
+      <a href="galileo-lab/index.html" class="sim-card">
+        <div class="sim-preview">
+          <canvas id="cvGalileo"></canvas>
+          <span class="preview-lbl">LIVE PREVIEW</span>
+        </div>
+        <div class="sim-body">
+          <div class="sim-card-hdr">
+            <div class="sim-title">Galileo Lab</div>
+            <span class="sim-badge">LIVE</span>
+          </div>
+          <p class="sim-desc">
+            Does mass affect how fast objects fall? Roll balls down a ramp, time the drops, and let the data tell you. A five-stage guided investigation ending with Galileo's real historical method.
+          </p>
+          <div class="sim-concepts">
+            <span class="concept-chip">Free fall</span>
+            <span class="concept-chip">Air resistance</span>
+            <span class="concept-chip">Ramp acceleration</span>
+            <span class="concept-chip">Scientific method</span>
+            <span class="concept-chip">Y9 / O-Level</span>
+          </div>
+          <div class="sim-footer">
+            <span class="sim-meta">5 stages · ~45 min</span>
+            <span class="sim-launch">
+              Launch
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+      <!-- PENDULUM LAB -->
+      <a href="pendulum/index.html" class="sim-card">
+        <div class="sim-preview">
+          <canvas id="cvPendulum"></canvas>
+          <span class="preview-lbl">LIVE PREVIEW</span>
+        </div>
+        <div class="sim-body">
+          <div class="sim-card-hdr">
+            <div class="sim-title">Pendulum Lab</div>
+            <span class="sim-badge">LIVE</span>
+          </div>
+          <p class="sim-desc">
+            What determines a pendulum's period — length, mass, or amplitude? Vary each independently, time the oscillations, and graph T² against L to measure g experimentally.
+          </p>
+          <div class="sim-concepts">
+            <span class="concept-chip">Periodic motion</span>
+            <span class="concept-chip">Period & frequency</span>
+            <span class="concept-chip">Graphical analysis</span>
+            <span class="concept-chip">Measuring g</span>
+            <span class="concept-chip">Y9 / O-Level</span>
+          </div>
+          <div class="sim-footer">
+            <span class="sim-meta">Open investigation · ~30 min</span>
+            <span class="sim-launch">
+              Launch
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- DYNAMICS -->
+  <div class="chapter" id="ch-dynamics">
+    <div class="chapter-hdr">
+      <span class="ch-num">Topic 03</span>
+      <h3 class="ch-name">Dynamics & Forces</h3>
+      <div class="ch-tags">
+        <span class="ch-tag">Newton's laws</span>
+        <span class="ch-tag">Friction</span>
+        <span class="ch-tag">Terminal velocity</span>
+        <span class="ch-tag">Free body diagrams</span>
+      </div>
+    </div>
+    <div class="ch-empty">
+      <div class="ch-empty-icon">⚡</div>
+      <div class="ch-empty-text">
+        <strong>Simulations coming soon</strong>
+        Newton's laws investigations — explore how force, mass and acceleration relate. Terminal velocity experiments connecting directly to the Galileo Lab air resistance demos.
+      </div>
+    </div>
+  </div>
+
+  <!-- MOMENTS -->
+  <div class="chapter" id="ch-moments">
+    <div class="chapter-hdr">
+      <span class="ch-num">Topic 04</span>
+      <h3 class="ch-name">Moments & Turning Effects of Forces</h3>
+      <div class="ch-tags">
+        <span class="ch-tag">Moment of a force</span>
+        <span class="ch-tag">Principle of moments</span>
+        <span class="ch-tag">Centre of gravity</span>
+        <span class="ch-tag">Stability</span>
+      </div>
+    </div>
+    <div class="ch-empty">
+      <div class="ch-empty-icon">⚖️</div>
+      <div class="ch-empty-text">
+        <strong>Simulations coming soon</strong>
+        Balance and lever investigations — predict where to place a load to balance a beam, then discover the principle of moments through the data.
+      </div>
+    </div>
+  </div>
+
+  <!-- ENERGY -->
+  <div class="chapter" id="ch-energy">
+    <div class="chapter-hdr">
+      <span class="ch-num">Topic 05</span>
+      <h3 class="ch-name">Work, Energy & Power</h3>
+      <div class="ch-tags">
+        <span class="ch-tag">Kinetic energy</span>
+        <span class="ch-tag">Potential energy</span>
+        <span class="ch-tag">Conservation of energy</span>
+        <span class="ch-tag">Efficiency</span>
+      </div>
+    </div>
+    <div class="ch-empty">
+      <div class="ch-empty-icon">🔋</div>
+      <div class="ch-empty-text">
+        <strong>Simulations coming soon</strong>
+        Energy conservation experiments — roller coasters, pendulums, ramps. Watch energy transform between kinetic and potential and discover why it's never truly lost.
+      </div>
+    </div>
+  </div>
+
+  <!-- PRESSURE -->
+  <div class="chapter" id="ch-pressure">
+    <div class="chapter-hdr">
+      <span class="ch-num">Topic 06</span>
+      <h3 class="ch-name">Pressure & Density</h3>
+      <div class="ch-tags">
+        <span class="ch-tag">Pressure in fluids</span>
+        <span class="ch-tag">Atmospheric pressure</span>
+        <span class="ch-tag">Archimedes' principle</span>
+        <span class="ch-tag">Buoyancy</span>
+      </div>
+    </div>
+    <div class="ch-empty">
+      <div class="ch-empty-icon">💧</div>
+      <div class="ch-empty-text">
+        <strong>Simulations coming soon</strong>
+        Fluid pressure and buoyancy investigations — why does a heavy ship float? What determines whether an object sinks or rises?
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer class="page-footer">
+  <a href="../index.html" class="footer-logo">Inquisitive<span>Physics</span></a>
+  <span class="footer-copy">Mechanics Module · Secondary / O-Level</span>
+  <div class="footer-links">
+    <a href="../index.html">← Home</a>
+    <a href="../index.html#teachers">For Teachers</a>
+    <a href="../index.html#contact">Feedback</a>
+    <a href="https://github.com/Cantaresg/physics_math_sim" target="_blank">GitHub</a>
+  </div>
+</footer>
+
+<script>
+// ── SCROLL REVEAL
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('visible'), i * 80);
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.08 });
+document.querySelectorAll('.chapter').forEach(el => observer.observe(el));
+
+// ── GALILEO PREVIEW
+(function() {
+  const cv = document.getElementById('cvGalileo');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  let W, H, rafId, t = 0;
+
+  function resize() { W = cv.offsetWidth; H = cv.offsetHeight; cv.width = W; cv.height = H; }
+
+  function draw() {
+    t += 0.016;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#07090f'; ctx.fillRect(0, 0, W, H);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    // Ramp surface
+    const rx = W*0.10, ry = H*0.85, tx2 = W*0.90, ty2 = H*0.15;
+    const grd = ctx.createLinearGradient(tx2,ty2,rx,ry);
+    grd.addColorStop(0,'#243050'); grd.addColorStop(1,'#18243c');
+    ctx.beginPath(); ctx.moveTo(tx2,ty2); ctx.lineTo(rx,ry); ctx.lineTo(rx,ry-8); ctx.lineTo(tx2,ty2-8); ctx.closePath();
+    ctx.fillStyle = grd; ctx.fill();
+    ctx.strokeStyle = '#4a5e8c'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(tx2,ty2); ctx.lineTo(rx,ry); ctx.stroke();
+
+    // Underside triangle
+    ctx.beginPath(); ctx.moveTo(tx2,ty2); ctx.lineTo(rx,ry); ctx.lineTo(tx2,ry); ctx.closePath();
+    ctx.fillStyle = '#0b1018'; ctx.fill();
+
+    // Two balls — same speed proving mass independence
+    const rLen = Math.sqrt((tx2-rx)**2+(ty2-ry)**2);
+    const ux2 = (rx-tx2)/rLen, uy2 = (ry-ty2)/rLen;
+    const prog = (Math.sin(t*0.65)*0.5+0.5);
+    const bx = tx2 + ux2*prog*rLen*0.85;
+    const by = ty2 + uy2*prog*rLen*0.85;
+
+    // Heavy ball (purple) — offset along ramp normal
+    const nx = -uy2, ny = ux2;
+    const h1x = bx + nx*8, h1y = by + ny*8;
+    let halo = ctx.createRadialGradient(h1x,h1y,0,h1x,h1y,20);
+    halo.addColorStop(0,'rgba(199,125,255,0.18)'); halo.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(h1x,h1y,20,0,Math.PI*2); ctx.fillStyle=halo; ctx.fill();
+    let sph = ctx.createRadialGradient(h1x-4,h1y-4,0,h1x,h1y,10);
+    sph.addColorStop(0,'#d4a0ff'); sph.addColorStop(1,'#8850cc');
+    ctx.beginPath(); ctx.arc(h1x,h1y,10,0,Math.PI*2);
+    ctx.fillStyle=sph; ctx.shadowColor='#c77dff44'; ctx.shadowBlur=10; ctx.fill(); ctx.shadowBlur=0;
+
+    // Light ball (gold)
+    const h2x = bx - nx*8, h2y = by - ny*8;
+    halo = ctx.createRadialGradient(h2x,h2y,0,h2x,h2y,16);
+    halo.addColorStop(0,'rgba(255,209,102,0.18)'); halo.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(h2x,h2y,16,0,Math.PI*2); ctx.fillStyle=halo; ctx.fill();
+    sph = ctx.createRadialGradient(h2x-3,h2y-3,0,h2x,h2y,8);
+    sph.addColorStop(0,'#ffd166'); sph.addColorStop(1,'#b08010');
+    ctx.beginPath(); ctx.arc(h2x,h2y,8,0,Math.PI*2);
+    ctx.fillStyle=sph; ctx.shadowColor='#ffd16644'; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0;
+
+    // Labels
+    ctx.font='500 9px DM Mono,monospace'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(199,125,255,0.55)'; ctx.fillText('Heavy',h1x,h1y+22);
+    ctx.fillStyle='rgba(255,209,102,0.55)'; ctx.fillText('Light',h2x,h2y-20);
+
+    // Angle arc hint
+    ctx.strokeStyle='rgba(77,240,176,0.3)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(rx,ry,36,-Math.PI/2,-Math.PI/2+Math.atan2(ty2-ry,tx2-rx)*-1); ctx.stroke();
+    ctx.fillStyle='rgba(77,240,176,0.4)'; ctx.font='9px DM Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText('30°',rx+40,ry-10);
+
+    // Pivot dot
+    ctx.beginPath(); ctx.arc(tx2,ty2,3,0,Math.PI*2);
+    ctx.fillStyle='#4df0b0'; ctx.shadowColor='#4df0b055'; ctx.shadowBlur=6; ctx.fill(); ctx.shadowBlur=0;
+
+    rafId = requestAnimationFrame(draw);
+  }
+
+  resize(); draw();
+  const io = new IntersectionObserver(e => {
+    e.forEach(en => {
+      if (en.isIntersecting) { if(!rafId) rafId=requestAnimationFrame(draw); }
+      else { cancelAnimationFrame(rafId); rafId=null; }
+    });
+  });
+  io.observe(cv);
+})();
+
+// ── PENDULUM PREVIEW
+(function() {
+  const cv = document.getElementById('cvPendulum');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  let W, H, rafId;
+  const G=9.81, L=0.5;
+  let theta=22*Math.PI/180, omega=0, lastTs=null;
+
+  function resize() { W=cv.offsetWidth; H=cv.offsetHeight; cv.width=W; cv.height=H; }
+
+  function rk4(th,om,dt) {
+    const f=(t,o)=>[o,-(G/L)*Math.sin(t)];
+    const [k1t,k1o]=f(th,om);
+    const [k2t,k2o]=f(th+.5*dt*k1t,om+.5*dt*k1o);
+    const [k3t,k3o]=f(th+.5*dt*k2t,om+.5*dt*k2o);
+    const [k4t,k4o]=f(th+dt*k3t,om+dt*k3o);
+    return [th+dt/6*(k1t+2*k2t+2*k3t+k4t),om+dt/6*(k1o+2*k2o+2*k3o+k4o)];
+  }
+
+  function draw(ts) {
+    if(!lastTs) lastTs=ts;
+    const wdt=Math.min((ts-lastTs)/1000,0.033); lastTs=ts;
+    const steps=12, dt=wdt/steps;
+    for(let i=0;i<steps;i++) [theta,omega]=rk4(theta,omega,dt);
+
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#07090f'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(255,255,255,0.02)'; ctx.lineWidth=1;
+    for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+    const SCALE=Math.min(W,H)*0.54;
+    const px=W/2, py=H*0.16;
+    const bobX=px+Math.sin(theta)*SCALE;
+    const bobY=py+Math.cos(theta)*SCALE;
+
+    // Ceiling mount
+    ctx.fillStyle='#1a2035';
+    ctx.beginPath(); ctx.roundRect(px-36,py-13,72,13,3); ctx.fill();
+    ctx.strokeStyle='#2e3a58'; ctx.lineWidth=1; ctx.stroke();
+
+    // Vertical ref
+    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1; ctx.setLineDash([4,7]);
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,py+SCALE+18); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // String
+    ctx.strokeStyle='#d4b896'; ctx.lineWidth=1.8;
+    ctx.shadowColor='rgba(212,184,150,0.12)'; ctx.shadowBlur=4;
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(bobX,bobY); ctx.stroke();
+    ctx.shadowBlur=0;
+
+    // Ghost trail
+    for(let i=1;i<=4;i++){
+      const tr=theta-omega*(i*0.05);
+      const tx3=px+Math.sin(tr)*SCALE, ty3=py+Math.cos(tr)*SCALE;
+      ctx.beginPath(); ctx.arc(tx3,ty3,10*(i/4),0,Math.PI*2);
+      ctx.fillStyle=`rgba(77,240,176,${0.04*i})`; ctx.fill();
+    }
+
+    // Bob glow
+    const halo=ctx.createRadialGradient(bobX,bobY,0,bobX,bobY,26);
+    halo.addColorStop(0,'rgba(77,240,176,0.22)'); halo.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(bobX,bobY,26,0,Math.PI*2); ctx.fillStyle=halo; ctx.fill();
+
+    // Bob
+    const sph=ctx.createRadialGradient(bobX-4,bobY-4,0,bobX,bobY,12);
+    sph.addColorStop(0,'#4df0b0'); sph.addColorStop(0.6,'#4df0b0cc'); sph.addColorStop(1,'#28a876');
+    ctx.beginPath(); ctx.arc(bobX,bobY,12,0,Math.PI*2);
+    ctx.fillStyle=sph; ctx.shadowColor='#4df0b044'; ctx.shadowBlur=14; ctx.fill();
+    ctx.strokeStyle='#28a876'; ctx.lineWidth=1.2; ctx.stroke(); ctx.shadowBlur=0;
+
+    // Pivot
+    ctx.beginPath(); ctx.arc(px,py,4,0,Math.PI*2);
+    ctx.fillStyle='#4df0b0'; ctx.shadowColor='#4df0b055'; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0;
+
+    // T label
+    const T=(2*Math.PI*Math.sqrt(L/G)).toFixed(2);
+    ctx.font='500 9px DM Mono,monospace'; ctx.textAlign='right';
+    ctx.fillStyle='rgba(77,240,176,0.4)'; ctx.fillText(`T ≈ ${T} s`,W-10,H-10);
+
+    rafId=requestAnimationFrame(draw);
+  }
+
+  resize(); rafId=requestAnimationFrame(draw);
+  const io=new IntersectionObserver(e=>{
+    e.forEach(en=>{
+      if(en.isIntersecting){lastTs=null;if(!rafId)rafId=requestAnimationFrame(draw);}
+      else{cancelAnimationFrame(rafId);rafId=null;}
+    });
+  });
+  io.observe(cv);
+})();
+</script>
+</body>
+</html>
