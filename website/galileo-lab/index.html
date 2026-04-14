@@ -14,20 +14,21 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:         #0a0c12;
-  --surface:    #111520;
-  --surface2:   #161b28;
-  --border:     #252d42;
-  --border2:    #2e3850;
+  --bg:         #07090f;
+  --surface:    #0d1018;
+  --surface2:   #111520;
+  --border:     #1e2535;
+  --border2:    #263045;
   --accent:     #4df0b0;
   --accent-dim: rgba(77,240,176,0.12);
+  --glow:       rgba(77,240,176,0.15);
   --gold:       #ffd166;
   --gold-dim:   rgba(255,209,102,0.12);
   --purple:     #c77dff;
   --red:        #ff6b6b;
   --text:       #eef2ff;
   --text-mid:   #a8b4d0;
-  --text-dim:   #6b7a99;
+  --text-dim:   #5a6882;
 }
 
 html, body {
@@ -1189,11 +1190,9 @@ function rampCheckDiscovery() {
 
 function rampCSV() {
   if (!_rampDataRows.length) { alert('No data yet.'); return; }
-  let csv = 'Run,L (m),t heavy (s),t light (s),t² (s²)\n';
-  _rampDataRows.forEach(r => csv += `${r.n},${r.L},${r.tHeavy},${r.tLight},${r.t2Heavy}\n`);
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-  a.download = 'galileo_ramp_data.csv'; a.click();
+  const headers = ['Run','L (m)','t heavy (s)','t light (s)','t² (s²)'];
+  const rows = _rampDataRows.map(r => [r.n, r.L, r.tHeavy, r.tLight, r.t2Heavy]);
+  DataLogger.downloadRowsCSV('galileo_ramp_data.csv', headers, rows);
 }
 
 function submitRampDiscovery() {

@@ -3,25 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pendulum Lab — PhysicsSims</title>
+<title>Pendulum Lab — InquisitivePhysics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
 :root {
-  --bg: #0a0c12;
-  --surface: #111520;
-  --surface2: #161b28;
-  --border: #252d42;
-  --border2: #2e3850;
+  --bg: #07090f;
+  --surface: #0d1018;
+  --surface2: #111520;
+  --border: #1e2535;
+  --border2: #263045;
   --accent: #4df0b0;
   --accent-dim: rgba(77,240,176,0.12);
+  --glow: rgba(77,240,176,0.15);
   --gold: #ffd166;
   --gold-dim: rgba(255,209,102,0.12);
   --purple: #c77dff;
   --red: #ff6b6b;
   --text: #eef2ff;
   --text-mid: #a8b4d0;
-  --text-dim: #6b7a99;
+  --text-dim: #5a6882;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -42,8 +44,11 @@ header {
   border-bottom: 1px solid var(--border);
   gap: 16px; flex-shrink: 0;
 }
-.logo { font-size: 1rem; font-weight: 700; color: var(--accent); }
-.logo em { color: var(--text); font-style: normal; }
+.nav-logo { font-family: 'Instrument Serif', serif; font-size: 1.1rem; color: var(--text); text-decoration: none; letter-spacing: -0.01em; flex-shrink: 0; }
+.nav-logo span { color: var(--accent); }
+.header-divider { width: 1px; height: 20px; background: var(--border2); flex-shrink: 0; }
+.header-back { display: flex; align-items: center; gap: 6px; font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+.header-back:hover { color: var(--accent); }
 .page-title { font-size: 0.82rem; color: var(--text-mid); font-weight: 500; }
 .mode-pill {
   margin-left: auto;
@@ -237,8 +242,14 @@ tbody tr:hover td { background: var(--surface2); }
 <body>
 
 <header>
-  <div class="logo">Physics<em>Sims</em></div>
-  <div class="page-title">Pendulum Lab · O-Level</div>
+  <a href="../index.html" class="nav-logo">Inquisitive<span>Physics</span></a>
+  <div class="header-divider"></div>
+  <a href="../mechanics.html" class="header-back">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L3 7l6 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Mechanics
+  </a>
+  <div class="header-divider"></div>
+  <div class="page-title">Pendulum Lab</div>
   <div class="mode-pill" id="modePill">IDEAL MODE</div>
 </header>
 
@@ -788,11 +799,9 @@ function clearData(){
 
 function downloadCSV(){
   if(!dataRows.length){alert('No data yet.');return;}
-  let csv='Run,L (m),Oscillations,Time (s),T (s),T² (s²)\n';
-  dataRows.forEach(r=>csv+=`${r.n},${r.L},${r.osc},${r.t},${r.T},${r.T2}\n`);
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download='pendulum_data.csv'; a.click();
+  const headers=['Run','L (m)','Oscillations','Time (s)','T (s)','T² (s²)'];
+  const rows = dataRows.map(r=>[r.n, r.L, r.osc, r.t, r.T, r.T2]);
+  DataLogger.downloadRowsCSV('pendulum_data.csv', headers, rows);
 }
 
 // ── GRAPH ──────────────────────────────────────────────────────────────────
@@ -816,7 +825,7 @@ function drawGraph(){
   const pad={l:64,r:32,t:38,b:50};
   const pw=GW-pad.l-pad.r, ph=GH-pad.t-pad.b;
 
-  g2.fillStyle='#0a0c12'; g2.fillRect(0,0,GW,GH);
+  g2.fillStyle='#07090f'; g2.fillRect(0,0,GW,GH);
 
   const Lv=dataRows.map(r=>r.L), T2v=dataRows.map(r=>r.T2);
   const maxL=Math.max(...Lv)*1.2, maxT2=Math.max(...T2v)*1.2;
