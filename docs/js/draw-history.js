@@ -279,6 +279,8 @@ const DrawHistory = (() => {
       const W=cv.offsetWidth||480, H=300;
       if(cv.width!==W){cv.width=W;}
       const ctx=cv.getContext('2d');
+      const sf=Math.max(0.65,Math.min(1.2,W/480));
+      const _f=px=>Math.max(8,Math.round(px*sf));
       const TOP=H*0.18, BOT=TOP+DROP_M*SCALE_PX, LA=W*0.32, LB=W*0.68;
       ctx.clearRect(0,0,W,H);
       // grid
@@ -288,7 +290,7 @@ const DrawHistory = (() => {
       // ruler
       ctx.strokeStyle='rgba(77,240,176,0.15)'; ctx.setLineDash([2,5]);
       ctx.beginPath();ctx.moveTo(24,TOP);ctx.lineTo(24,BOT);ctx.stroke();ctx.setLineDash([]);
-      ctx.fillStyle='rgba(77,240,176,0.35)';ctx.font='9px DM Mono,monospace';ctx.textAlign='right';
+      ctx.fillStyle='rgba(77,240,176,0.35)';ctx.font=`${_f(9)}px DM Mono,monospace`;ctx.textAlign='right';
       for(let m=0;m<=DROP_M;m++){
         const y=TOP+m*SCALE_PX; ctx.fillText(m+'m',22,y+3);
         ctx.strokeStyle='rgba(77,240,176,0.2)';ctx.lineWidth=1;
@@ -299,7 +301,7 @@ const DrawHistory = (() => {
       ctx.beginPath();ctx.roundRect(W*0.14,TOP-14,W*0.72,14,3);ctx.fill();
       ctx.strokeStyle='#2e3a58';ctx.lineWidth=1;ctx.stroke();
       // lane labels — above platform
-      ctx.font='10px DM Mono,monospace';ctx.textAlign='center';
+      ctx.font=`${_f(10)}px DM Mono,monospace`;ctx.textAlign='center';
       ctx.fillStyle='#ffd16699';ctx.fillText('Flat paper',LA,TOP-19);
       ctx.fillStyle='#ffd16699';ctx.fillText('Crumpled',LB,TOP-19);
       // ground
@@ -312,15 +314,15 @@ const DrawHistory = (() => {
       if(phase==='countdown'){
         _drawPaper(ctx,LA,TOP-4,0); _drawCrumpled(ctx,LB,TOP-4);
         ctx.save();ctx.textAlign='center';
-        if(cd>0){ctx.font='700 52px DM Sans,sans-serif';ctx.fillStyle='#4df0b0';ctx.shadowColor='#4df0b044';ctx.shadowBlur=20;ctx.fillText(cd,W/2,H/2+14);}
-        else{ctx.font='700 38px DM Sans,sans-serif';ctx.fillStyle='#ffd166';ctx.shadowColor='#ffd16644';ctx.shadowBlur=16;ctx.fillText('DROP!',W/2,H/2+10);}
+        if(cd>0){ctx.font=`700 ${_f(52)}px DM Sans,sans-serif`;ctx.fillStyle='#4df0b0';ctx.shadowColor='#4df0b044';ctx.shadowBlur=20;ctx.fillText(cd,W/2,H/2+14);}
+        else{ctx.font=`700 ${_f(38)}px DM Sans,sans-serif`;ctx.fillStyle='#ffd166';ctx.shadowColor='#ffd16644';ctx.shadowBlur=16;ctx.fillText('DROP!',W/2,H/2+10);}
         ctx.shadowBlur=0;ctx.restore();return;
       }
       // objects
       const yA=TOP+objA.s*SCALE_PX, yB=TOP+objB.s*SCALE_PX;
       _drawPaper(ctx,LA+wobA,yA,wobA); _drawCrumpled(ctx,LB,yB);
-      if(objA.landed) _landedTag(ctx,LA,BOT,'#ffd166',objA.landT);
-      if(objB.landed) _landedTag(ctx,LB,BOT,'#ffd166',objB.landT);
+      if(objA.landed) _landedTag(ctx,LA,BOT,'#ffd166',objA.landT,sf);
+      if(objB.landed) _landedTag(ctx,LB,BOT,'#ffd166',objB.landT,sf);
     }
 
     function _drawPaper(ctx,x,y,wob){
@@ -340,16 +342,18 @@ const DrawHistory = (() => {
       g.addColorStop(0,'#eae6d6');g.addColorStop(1,'#b0a898');
       ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='#a09888';ctx.lineWidth=0.8;ctx.stroke();ctx.restore();
     }
-    function _landedTag(ctx,x,bot,col,t){
-      ctx.font='600 9px DM Mono,monospace';ctx.textAlign='center';ctx.fillStyle=col;ctx.fillText('LANDED',x,bot+14);
-      if(t!==null){ctx.font='9px DM Mono,monospace';ctx.fillStyle=col+'88';ctx.fillText(t.toFixed(3)+'s',x,bot+24);}
+    function _landedTag(ctx,x,bot,col,t,sf){
+      const _f=px=>Math.max(8,Math.round(px*sf));
+      ctx.font=`600 ${_f(9)}px DM Mono,monospace`;ctx.textAlign='center';ctx.fillStyle=col;ctx.fillText('LANDED',x,bot+14);
+      if(t!==null){ctx.font=`${_f(9)}px DM Mono,monospace`;ctx.fillStyle=col+'88';ctx.fillText(t.toFixed(3)+'s',x,bot+24);}
     }
 
     // idle render
     requestAnimationFrame(()=>{
       cv.width=cv.offsetWidth||480;
       const ctx=cv.getContext('2d');
-      ctx.fillStyle='rgba(77,240,176,0.25)';ctx.font='12px DM Sans,sans-serif';ctx.textAlign='center';
+      const sf0=Math.max(0.65,Math.min(1.2,cv.width/480));
+      ctx.fillStyle='rgba(77,240,176,0.25)';ctx.font=`${Math.max(8,Math.round(12*sf0))}px DM Sans,sans-serif`;ctx.textAlign='center';
       ctx.fillText('Click ▶ Watch the drop to begin',cv.width/2, cv.height/2);
     });
 

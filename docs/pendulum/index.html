@@ -232,6 +232,14 @@ tbody tr:hover td { background: var(--surface2); }
 }
 .ai-q:hover { border-color: var(--accent); color: var(--text); background: var(--accent-dim); }
 
+/* Shrink side panel on intermediate screen sizes before full collapse */
+@media (max-width: 1200px) {
+  .side-panel { width: 260px; }
+}
+@media (max-width: 1000px) {
+  .side-panel { width: 230px; }
+}
+
 @media (max-width: 860px) {
   .app { flex-direction: column; }
   .side-panel { width: 100%; border-top: 1px solid var(--border); }

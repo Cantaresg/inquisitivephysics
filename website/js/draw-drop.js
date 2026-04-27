@@ -112,6 +112,12 @@ const DrawDrop = (() => {
     let _rafId       = null;
     let _initialised = false;
 
+    let _sf       = 1;          // font scale factor (W/800, clamped 0.65–1.4)
+    let _simScale = SIM_SCALE;  // px/metre — shrinks on short canvases
+
+    // Scale a font size and floor at 8px so text is never unreadable
+    const _f = px => Math.max(8, Math.round(px * _sf));
+
     function _syncSize() {
       const dpr  = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
@@ -125,6 +131,8 @@ const DrawDrop = (() => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       W = lw;
       H = lh;
+      _sf       = Math.max(0.65, Math.min(1.4, W / 800));
+      _simScale = Math.min(SIM_SCALE, Math.max(36, Math.round(H * 0.60 / DROP_HEIGHT_M)));
     }
 
     _syncSize();
@@ -173,10 +181,10 @@ const DrawDrop = (() => {
 
     // ── LAYOUT ──────────────────────────────────────────────────────────────
     function _topY()    { return H * 0.20; }  // more header room for title + labels
-    function _bottomY() { return _topY() + DROP_PX; }
+    function _bottomY() { return _topY() + DROP_HEIGHT_M * _simScale; }
     function _laneAX()  { return W * LANE_A; }
     function _laneBX()  { return W * LANE_B; }
-    function _simToY(s) { return _topY() + s * SIM_SCALE; }
+    function _simToY(s) { return _topY() + s * _simScale; }
 
     // ── PUBLIC CONTROLS ──────────────────────────────────────────────────────
 
@@ -393,7 +401,7 @@ const DrawDrop = (() => {
       ctx.setLineDash([]);
 
       ctx.fillStyle  = 'rgba(77,240,176,0.3)';
-      ctx.font       = '10px DM Mono, monospace';
+      ctx.font       = `${_f(10)}px DM Mono, monospace`;
       ctx.textAlign  = 'right';
       for (let m = 0; m <= DROP_HEIGHT_M; m++) {
         const y = _simToY(m);
@@ -407,7 +415,7 @@ const DrawDrop = (() => {
       const colA = demo ? (_objForKey(demo.laneAKey).trackColor || '#ffd166') : '#ffd166';
       const colB = demo ? (_objForKey(demo.laneBKey).trackColor || '#4df0b0') : '#4df0b0';
       if (demo) {
-        ctx.font = '600 13px DM Sans, sans-serif'; ctx.fillStyle = '#eef2ff';
+        ctx.font = `600 ${_f(13)}px DM Sans, sans-serif`; ctx.fillStyle = '#eef2ff';
         ctx.textAlign = 'center';
         ctx.fillText(demo.title, W / 2, top - 56);
       }
@@ -419,7 +427,7 @@ const DrawDrop = (() => {
 
       // Lane labels — drawn ON TOP of platform so they're never covered
       if (demo) {
-        ctx.font = '600 11px DM Mono, monospace'; ctx.textAlign = 'center';
+        ctx.font = `600 ${_f(11)}px DM Mono, monospace`; ctx.textAlign = 'center';
         ctx.fillStyle = colA + 'ee';
         ctx.fillText(demo.laneALabel, _laneAX(), top - 6);
         ctx.fillStyle = colB + 'ee';
@@ -444,7 +452,7 @@ const DrawDrop = (() => {
     // Small pip indicators showing which demos are done
     function _drawProgressPips() {
       const labels = ['Demo 1', 'Demo 2', 'Demo 3'];
-      ctx.font = '10px DM Mono, monospace'; ctx.textAlign = 'center';
+      ctx.font = `${_f(10)}px DM Mono, monospace`; ctx.textAlign = 'center';
       labels.forEach((lbl, i) => {
         const x   = W - 80 + i * 28;
         const y   = 18;
@@ -584,7 +592,7 @@ const DrawDrop = (() => {
 
       // Arrow showing paper is ON the book
       ctx.fillStyle = 'rgba(77,240,176,0.5)';
-      ctx.font = '9px DM Mono, monospace'; ctx.textAlign = 'center';
+      ctx.font = `${_f(9)}px DM Mono, monospace`; ctx.textAlign = 'center';
       ctx.fillText('on top', 0, -20);
 
       ctx.restore();
@@ -616,7 +624,7 @@ const DrawDrop = (() => {
     }
 
     function _drawLandedTag(x, y, color) {
-      ctx.font = '600 10px DM Mono, monospace';
+      ctx.font = `600 ${_f(10)}px DM Mono, monospace`;
       ctx.textAlign = 'center';
       ctx.fillStyle = color;
       ctx.fillText('LANDED', x, y);
@@ -636,16 +644,16 @@ const DrawDrop = (() => {
     function _drawCountdown(ts) {
       ctx.save(); ctx.textAlign = 'center';
       if (_countdown > 0) {
-        ctx.font = '700 64px DM Sans, sans-serif';
+        ctx.font = `700 ${_f(64)}px DM Sans, sans-serif`;
         ctx.fillStyle = '#4df0b0';
         ctx.shadowColor = '#4df0b055'; ctx.shadowBlur = 30;
         ctx.fillText(_countdown, W / 2, H / 2 + 20);
         ctx.shadowBlur = 0;
-        ctx.font = '13px DM Mono, monospace';
+        ctx.font = `${_f(13)}px DM Mono, monospace`;
         ctx.fillStyle = 'rgba(168,180,208,0.7)';
         ctx.fillText('GET READY', W / 2, H / 2 + 50);
       } else {
-        ctx.font = '700 48px DM Sans, sans-serif';
+        ctx.font = `700 ${_f(48)}px DM Sans, sans-serif`;
         ctx.fillStyle = '#ffd166';
         ctx.shadowColor = '#ffd16655'; ctx.shadowBlur = 24;
         ctx.fillText('DROP!', W / 2, H / 2 + 16);
@@ -656,12 +664,13 @@ const DrawDrop = (() => {
 
     function _drawPredictBanner(demo) {
       ctx.save();
+      const bw = Math.min(400, W - 40);
       ctx.fillStyle = 'rgba(10,12,18,0.75)';
-      _rrect(ctx,W/2 - 200,H/2 - 32,400,56,10); ctx.fill();
+      _rrect(ctx, W/2 - bw/2, H/2 - 32, bw, 56, 10); ctx.fill();
       ctx.textAlign = 'center';
-      ctx.font = '600 14px DM Sans, sans-serif'; ctx.fillStyle = '#eef2ff';
+      ctx.font = `600 ${_f(14)}px DM Sans, sans-serif`; ctx.fillStyle = '#eef2ff';
       ctx.fillText(demo.predictionPrompt, W/2, H/2 - 8);
-      ctx.font = '11px DM Mono, monospace'; ctx.fillStyle = '#a8b4d0';
+      ctx.font = `${_f(11)}px DM Mono, monospace`; ctx.fillStyle = '#a8b4d0';
       ctx.fillText('(Answer the prediction panel to continue)', W/2, H/2 + 16);
       ctx.restore();
     }
@@ -681,7 +690,7 @@ const DrawDrop = (() => {
         ctx.lineWidth = 1;
         ctx.stroke();
         // Label
-        ctx.font = '700 10px DM Mono, monospace';
+        ctx.font = `700 ${_f(10)}px DM Mono, monospace`;
         ctx.textAlign = 'center';
         ctx.fillStyle = col;
         ctx.fillText('LANDED', x, bot + 21);
@@ -689,7 +698,7 @@ const DrawDrop = (() => {
         // Time below pill
         if (timeStr) {
           ctx.save();
-          ctx.font = '500 10px DM Mono, monospace';
+          ctx.font = `500 ${_f(10)}px DM Mono, monospace`;
           ctx.textAlign = 'center';
           ctx.fillStyle = col + 'cc';
           ctx.fillText(timeStr, x, bot + 36);
@@ -713,13 +722,14 @@ const DrawDrop = (() => {
         const isTie = diff < 0.05;
         const winner = _objA.landT < _objB.landT ? demo.laneALabel : demo.laneBLabel;
         const msg   = isTie ? 'They landed at the same time!' : `${winner} landed first.`;
+        const bw2 = Math.min(380, W - 40);
         ctx.save(); ctx.globalAlpha = alpha;
         ctx.fillStyle = 'rgba(10,12,18,0.85)';
-        _rrect(ctx, W/2 - 190, H*0.52 - 28, 380, 56, 10); ctx.fill();
+        _rrect(ctx, W/2 - bw2/2, H*0.52 - 28, bw2, 56, 10); ctx.fill();
         ctx.textAlign = 'center';
-        ctx.font = '600 14px DM Sans, sans-serif'; ctx.fillStyle = '#eef2ff';
+        ctx.font = `600 ${_f(14)}px DM Sans, sans-serif`; ctx.fillStyle = '#eef2ff';
         ctx.fillText(msg, W/2, H*0.52 - 4);
-        ctx.font = '11px DM Mono, monospace'; ctx.fillStyle = '#a8b4d0';
+        ctx.font = `${_f(11)}px DM Mono, monospace`; ctx.fillStyle = '#a8b4d0';
         ctx.fillText('What did you notice?', W/2, H*0.52 + 18);
         ctx.restore();
       }
@@ -732,38 +742,40 @@ const DrawDrop = (() => {
       const tB  = _objB.landT !== null ? _objB.landT : _simT;
       const fmt = t => String(Math.floor(t)).padStart(2,'0') + '.' + String(Math.floor((t % 1)*1000)).padStart(3,'0') + ' s';
       ctx.save();
-      ctx.font = '700 22px DM Mono, monospace'; ctx.textAlign = 'left';
+      ctx.font = `700 ${_f(22)}px DM Mono, monospace`; ctx.textAlign = 'left';
       ctx.fillStyle = '#4df0b0';
       ctx.shadowColor = '#4df0b055'; ctx.shadowBlur = (_phase === 'dropping') ? 12 : 0;
       ctx.fillText(fmt(_simT), 52, 40);
       ctx.shadowBlur = 0;
-      ctx.font = '10px DM Mono, monospace'; ctx.fillStyle = '#3a4a60';
+      ctx.font = `${_f(10)}px DM Mono, monospace`; ctx.fillStyle = '#3a4a60';
       ctx.fillText('ELAPSED', 52, 54);
       ctx.restore();
     }
 
     function _drawObserveBanner(demo) {
       ctx.save();
+      const bw3 = Math.min(420, W - 40);
       ctx.fillStyle = 'rgba(10,12,18,0.80)';
-      _rrect(ctx,W/2 - 210,H*0.7 - 28,420,52,10); ctx.fill();
+      _rrect(ctx, W/2 - bw3/2, H*0.7 - 28, bw3, 52, 10); ctx.fill();
       ctx.textAlign = 'center';
-      ctx.font = '600 13px DM Sans, sans-serif'; ctx.fillStyle = '#eef2ff';
+      ctx.font = `600 ${_f(13)}px DM Sans, sans-serif`; ctx.fillStyle = '#eef2ff';
       ctx.fillText(demo.observationPrompt, W/2, H*0.7 - 6);
-      ctx.font = '11px DM Mono, monospace'; ctx.fillStyle = '#a8b4d0';
+      ctx.font = `${_f(11)}px DM Mono, monospace`; ctx.fillStyle = '#a8b4d0';
       ctx.fillText('(Answer in the observation panel)', W/2, H*0.7 + 16);
       ctx.restore();
     }
 
     function _drawDoneBanner(demo) {
       const isLast = _demoIndex === DEMOS.length - 1;
+      const bw4 = Math.min(360, W - 40);
       ctx.save();
       ctx.fillStyle = 'rgba(77,240,176,0.08)';
-      _rrect(ctx,W/2 - 180,H*0.7 - 24,360,46,10); ctx.fill();
+      _rrect(ctx, W/2 - bw4/2, H*0.7 - 24, bw4, 46, 10); ctx.fill();
       ctx.strokeStyle = 'rgba(77,240,176,0.25)'; ctx.lineWidth = 1; ctx.stroke();
       ctx.textAlign = 'center';
-      ctx.font = '600 13px DM Sans, sans-serif'; ctx.fillStyle = '#4df0b0';
+      ctx.font = `600 ${_f(13)}px DM Sans, sans-serif`; ctx.fillStyle = '#4df0b0';
       ctx.fillText(isLast ? '✓ All demos complete!' : `✓ Demo ${_demoIndex + 1} done — next demo awaits`, W/2, H*0.7 - 4);
-      ctx.font = '11px DM Mono, monospace'; ctx.fillStyle = '#a8b4d0';
+      ctx.font = `${_f(11)}px DM Mono, monospace`; ctx.fillStyle = '#a8b4d0';
       ctx.fillText(isLast ? 'Continue to the History card →' : 'Click ▶ Start Demo ' + (_demoIndex + 2), W/2, H*0.7 + 16);
       ctx.restore();
     }
