@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PARTICLE — Playable Test</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#07090f;--surface:#0d1018;--border:#1e2535;--accent:#4df0b0;--text:#eef2ff;--text-dim:#5a6882;--gold:#ffd166}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;user-select:none}
+#game-canvas{position:fixed;inset:0;width:100%;height:100%;cursor:crosshair}
+#hud{position:fixed;top:0;left:0;right:0;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;pointer-events:none;z-index:10}
+#hud-left{display:flex;flex-direction:column;gap:2px}
+#level-title{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+#level-tip{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(77,240,176,.55);min-height:14px}
+#hud-right{display:flex;align-items:center;gap:12px}
+.star-pip{width:9px;height:9px;border-radius:50%;border:1px solid var(--text-dim);background:transparent;transition:background .3s,border-color .3s}
+.star-pip.lit{background:var(--accent);border-color:var(--accent)}
+#env-label{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--text-dim);letter-spacing:.08em}
+#vocab-reveal{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);font-family:'DM Mono',monospace;font-size:.7rem;color:var(--accent);letter-spacing:.06em;opacity:0;transition:opacity .5s;pointer-events:none;text-align:center;z-index:10}
+#vocab-reveal.visible{opacity:1}
+#complete-overlay{position:fixed;inset:0;background:rgba(5,8,16,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;opacity:0;pointer-events:none;transition:opacity .4s;z-index:20}
+#complete-overlay.visible{opacity:1;pointer-events:all}
+#complete-title{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
+#complete-level{font-size:1.6rem;font-weight:600;color:var(--text)}
+.complete-stars{display:flex;gap:10px}
+.complete-star{width:14px;height:14px;border-radius:50%;border:1px solid var(--text-dim);background:transparent;transition:background .35s,border-color .35s,transform .2s}
+.complete-star.lit{background:var(--accent);border-color:var(--accent);transform:scale(1.25)}
+#complete-vocab{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--accent);letter-spacing:.04em;min-height:18px;text-align:center}
+.btn-next{margin-top:8px;padding:10px 32px;border-radius:8px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.08em;cursor:pointer;transition:background .15s}
+.btn-next:hover{background:rgba(77,240,176,.1)}
+#btn-reset{position:fixed;bottom:20px;right:20px;padding:7px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:.6rem;cursor:pointer;z-index:10;transition:border-color .15s,color .15s}
+#btn-reset:hover{border-color:var(--text-dim);color:var(--text)}
+/* Stop-target countdown ring overlay */
+#stop-ring{position:fixed;pointer-events:none;z-index:5}
+#done-overlay{position:fixed;inset:0;background:rgba(5,8,16,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;opacity:0;pointer-events:none;transition:opacity .5s;z-index:30}
+#done-overlay.visible{opacity:1;pointer-events:all}
+#done-overlay h2{font-family:'DM Mono',monospace;font-size:1rem;letter-spacing:.1em;color:var(--accent)}
+#done-overlay p{font-size:.8rem;color:var(--text-dim);text-align:center;max-width:320px;line-height:1.6}
+</style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+<div id="hud">
+  <div id="hud-left">
+    <div id="level-title">Level 1 — First Contact</div>
+    <div id="level-tip"></div>
+  </div>
+  <div id="hud-right">
+    <div class="star-pip" id="sp0"></div>
+    <div class="star-pip" id="sp1"></div>
+    <div class="star-pip" id="sp2"></div>
+    <span id="env-label">DEEP SPACE</span>
+  </div>
+</div>
+<div id="vocab-reveal"></div>
+<div id="complete-overlay">
+  <div id="complete-title">Level Complete</div>
+  <div id="complete-level">First Contact</div>
+  <div class="complete-stars">
+    <div class="complete-star" id="cs0"></div>
+    <div class="complete-star" id="cs1"></div>
+    <div class="complete-star" id="cs2"></div>
+  </div>
+  <div id="complete-vocab"></div>
+  <button class="btn-next" id="btn-next">Continue →</button>
+</div>
+<div id="done-overlay">
+  <h2>TEST COMPLETE</h2>
+  <p>All 4 levels cleared.<br>blob.js + engine.js + input.js working.</p>
+  <button class="btn-next" onclick="location.reload()">Play Again</button>
+</div>
+<button id="btn-reset">↺ Restart Level</button>
+<script>
+/**
+ * monologue-data.js — PARTICLE game line pools
+ * Writer-editable. Zero logic. Pure data.
+ *
+ * Each pool: array of strings.
+ * Minimum pool size: 8 lines (prevents early repeats).
+ * monologue.js handles shuffle-without-replacement.
+ */
+
+const MonologueData = (() => {
+
+  const POOLS = {
+
+    // ── TRIGGER: force has antiparallel component to velocity ────────────────
+    opposing_force: [
+      "The force is against me. I was moving forward. This is a personal attack.",
+      "Excuse me. You are pushing me backwards. I had a direction. I had a plan.",
+      "I was going somewhere. I had momentum. What is this.",
+      "This feels deeply personal.",
+      "I am slowing down. WHY am I slowing down.",
+      "The force is... against me? That's not how this works.",
+      "Aristotle did not prepare me for this.",
+      "I object. Formally.",
+      "In 300 BC this would not have happened.",
+      "You are aware that I was moving, yes?",
+      "I had velocity. Good velocity. You have reduced it.",
+      "This is not the direction I agreed to.",
+    ],
+
+    // ── TRIGGER: zero net force, object in motion, >2s duration ─────────────
+    coasting: [
+      "Nobody is pushing me. I should be stopping. I am not stopping.",
+      "I have been moving for an uncomfortable amount of time without assistance.",
+      "Aristotle said I need a force to keep moving. Aristotle was very confident about this.",
+      "...Hello? Is anyone going to push me? No? I'll just... keep going then.",
+      "I don't know how to feel about this.",
+      "The void is not slowing me down. The void should be doing something.",
+      "This is against everything I was told.",
+      "I am becoming suspicious of Aristotle.",
+      "Still going. Still not stopping. This is fine. This is fine.",
+      "I would like to formally request some friction.",
+      "Rest is natural. Someone told me rest is natural. They were wrong.",
+      "I have been coasting for what feels like a philosophical amount of time.",
+    ],
+
+    // ── TRIGGER: force angle 70–110° from velocity direction ─────────────────
+    perpendicular: [
+      "You pushed sideways. I am now going sideways. These facts are related and I don't appreciate it.",
+      "My direction changed but my speed didn't. How. How did you do that.",
+      "This is not the trajectory I planned.",
+      "I was going perfectly straight. Straight is good. Straight made sense.",
+      "You pushed sideways. I curved. I didn't ask to curve.",
+      "The force was perpendicular. My velocity is now... different. I'm processing this.",
+      "Aristotle did not have a word for what just happened. Neither do I.",
+      "I appear to have changed direction without slowing down. This seems wrong.",
+      "Sideways force. Sideways result. The universe is being very literal today.",
+    ],
+
+    // ── TRIGGER: blob heading out of canvas bounds ────────────────────────────
+    off_screen: [
+      "Bold choice.",
+      "I respect the commitment. Not the direction.",
+      "We are going to need to have a conversation about vectors.",
+      "Aristotle would not have done this.",
+      "That was a lot of force for zero results.",
+      "I'm going to be honest. That was not ideal.",
+      "The target was in the other direction. For reference.",
+      "I have left the area. I hope you're pleased.",
+      "Out of bounds. Philosophically and literally.",
+      "I am now somewhere else. This is your fault.",
+    ],
+
+    // ── TRIGGER: first frame of a level with mass assigned ───────────────────
+    mass_introduced: [
+      "I feel... heavier. Something is different. Same push, less enthusiasm.",
+      "You pushed me the same way you pushed that other object. I am not that other object.",
+      "My resistance to motion has increased. I find this undignified.",
+      "Something has changed about my relationship with force. I'm taking notes.",
+      "I have mass now. I've been told this is significant.",
+    ],
+
+    // ── TRIGGER: blob reaches target ─────────────────────────────────────────
+    correct_hit: [
+      "Oh. Oh that was actually correct. Noted.",
+      "Fine. You understand vectors. Congratulations.",
+      "I'll admit that was well-executed.",
+      "...I'm not going to make a big deal of this.",
+      "Noted. You can do this. Noted.",
+      "Acceptable. Reluctantly.",
+      "That was the right direction. And the right magnitude. I'll allow it.",
+    ],
+
+    // ── TRIGGER: decelerating without player input (drag or friction) ─────────
+    friction_felt: [
+      "Something is slowing me down and it isn't you. The ground has opinions about my velocity.",
+      "This surface disagrees with my motion. Philosophically and physically.",
+      "I am experiencing resistance I did not request.",
+      "There is something wrong with the ground. The ground is doing something.",
+      "Aristotle would say this proves rest is natural. Aristotle would be partially right. This is complicated.",
+      "The air itself is pushing back. The air. I didn't think the air cared.",
+      "I am losing speed to nothing visible. This is unsettling.",
+      "Drag. Someone is going to tell me this is called drag.",
+    ],
+
+    // ── ENVIRONMENT TRANSITIONS ───────────────────────────────────────────────
+    // One line fires per transition, chosen randomly from 3 options.
+
+    transition_to_planet: [
+      "Something is pulling me. Very slightly. I'm choosing to ignore it for now.",
+      "The void feels less void-like than it did. Suspicious.",
+      "I detect a gravitational gradient. I have not consented to this.",
+    ],
+
+    transition_to_atmosphere: [
+      "There is resistance. The emptiness has opinions about my velocity.",
+      "I am experiencing drag. This is new. I don't like it.",
+      "Whatever this is, it is slowing me down without my permission.",
+    ],
+
+    transition_to_surface: [
+      "There is ground. Ground has friction. I know about friction now. I wish I didn't.",
+      "Gravity is no longer subtle. Gravity has committed.",
+      "There are structures here. They look confident. Structurally.",
+    ],
+
+    // ── MCQ INTRO ─────────────────────────────────────────────────────────────
+    mcq_intro: [
+      "I have questions. Let's see if you've been paying attention.",
+      "Alright. I have been pushed, curved, and generally disagreed with. Your turn.",
+      "You've been applying forces to me for some time. Let's find out if you learned anything.",
+      "The universe wants to know what you think. So do I. Primarily to disagree.",
+    ],
+
+    // ── MCQ FEEDBACK ─────────────────────────────────────────────────────────
+    // Keyed by result_certainty combinations
+    mcq_feedback: {
+      correct_sure:   "Your instinct is calibrated.",
+      correct_guess:  "Trust it. You're reading the physics right.",
+      correct_unsure: "Fortunate. But the universe was on your side.",
+      wrong_sure:     "Strong instinct. Wrong universe.",
+      wrong_guess:    "Good — you knew something was off.",
+      wrong_unsure:   "At least you were honest about it.",
+    },
+
+    // ── LEVEL COMPLETE — 3 STARS ──────────────────────────────────────────────
+    three_stars: [
+      "I'll admit that was well-executed.",
+      "...I'm not going to make a big deal of this.",
+      "Fine. You understand vectors. Congratulations.",
+      "Noted. You can do this. Noted.",
+      "That was correct. Efficiently correct. I have no notes.",
+    ],
+
+    // ── VOCABULARY REVEAL ─────────────────────────────────────────────────────
+    // Shown post-level as a single line. Not spoken by blob — HUD text only.
+    vocabulary: {
+      newton_1: "What you just saw: Newton's First Law.",
+      newton_2: "What you just felt: Newton's Second Law.",
+      vectors:  "Why direction mattered: that's what a vector is.",
+      drag:     "What slowed you without friction: drag.",
+      terminal: "When acceleration stopped: terminal velocity.",
+      friction: "What the surface did to your motion: friction.",
+    },
+
+  };
+
+  return { POOLS };
+
+})();
+
+if (typeof module !== 'undefined') module.exports = MonologueData;
+</script><script>
+/**
+ * blob.js — PARTICLE game character
+ * The blob. Aristotelian by default. Reluctant traveller.
+ *
+ * No dependencies. Pure canvas 2D.
+ * Usage: const b = Blob.create(x, y); b.update(dt); b.draw(ctx);
+ */
+
+const Blob = (() => {
+
+  // ── CONSTANTS ────────────────────────────────────────────────────────────────
+
+  const BASE_RADIUS      = 28;
+  const WOBBLE_AMPLITUDE = 3;
+  const WOBBLE_SPEED     = 1.8;
+  const NUM_POINTS       = 8;
+  const COLOUR_LERP      = 0.03;
+  const SQUISH_RECOVERY  = 0.08;
+  const EYE_RADIUS       = 3.5;
+  const EYE_OFFSET_X     = 8;
+  const EYE_OFFSET_Y     = -4;
+  const BUBBLE_MAX_W     = 220;
+  const BUBBLE_PADDING   = 12;
+  const BUBBLE_FONT      = '0.72rem DM Mono, monospace';
+  const BUBBLE_LINE_H    = 16;
+  const BUBBLE_FADE_IN   = 300;   // ms
+  const BUBBLE_HOLD      = 3500;  // ms
+  const BUBBLE_FADE_OUT  = 500;   // ms
+
+  // ── PARTICLE CONSTANTS ────────────────────────────────────────────────────────
+  const MAX_PARTICLES    = 24;    // total pool size
+
+  // ── COLOUR PALETTE ───────────────────────────────────────────────────────────
+
+  const PALETTE = {
+    neutral:   { h: 270, s: 40, l: 60 },
+    confused:  { h: 240, s: 40, l: 63 },
+    offended:  { h: 320, s: 42, l: 63 },
+    alarmed:   { h: 280, s: 52, l: 73 },
+    smug:      { h: 260, s: 45, l: 52 },
+    resigned:  { h: 265, s: 15, l: 58 },
+    impressed: { h: 290, s: 42, l: 63 },
+  };
+
+  // ── EXPRESSION DEFINITIONS ───────────────────────────────────────────────────
+  // eyeScale: multiplier on EYE_RADIUS
+  // eyeSpreadX: multiplier on EYE_OFFSET_X
+  // eyeOffsetY: additive px adjustment
+  // mouthCurve: bezier control point vertical offset (+smile, -frown)
+  // mouthWidth: half-width of mouth in px
+  // wobbleScale: multiplier on WOBBLE_AMPLITUDE
+  // wobbleSpeedScale: multiplier on WOBBLE_SPEED
+
+  const EXPRESSIONS = {
+    neutral: {
+      eyeScale: 1.0, eyeSpreadX: 1.0, eyeOffsetY: 0,
+      mouthCurve: 0, mouthWidth: 9,
+      wobbleScale: 1.0, wobbleSpeedScale: 1.0,
+      bodyPuff: 0,
+    },
+    confused: {
+      eyeScale: 1.1, eyeSpreadX: 1.15, eyeOffsetY: -1,
+      mouthCurve: -2, mouthWidth: 8,
+      wobbleScale: 1.1, wobbleSpeedScale: 0.9,
+      bodyPuff: 0,
+    },
+    offended: {
+      eyeScale: 0.75, eyeSpreadX: 0.9, eyeOffsetY: 1,
+      mouthCurve: -4, mouthWidth: 10,
+      wobbleScale: 1.2, wobbleSpeedScale: 1.1,
+      bodyPuff: 0.06,
+    },
+    alarmed: {
+      eyeScale: 1.5, eyeSpreadX: 0.7, eyeOffsetY: -3,
+      mouthCurve: 0, mouthWidth: 5,   // small O
+      wobbleScale: 0.5, wobbleSpeedScale: 2.0,
+      bodyPuff: 0,
+    },
+    smug: {
+      eyeScale: 0.65, eyeSpreadX: 1.0, eyeOffsetY: 1,
+      mouthCurve: 3, mouthWidth: 10,
+      wobbleScale: 0.7, wobbleSpeedScale: 0.7,  // slow, self-satisfied
+      bodyPuff: 0.04,
+    },
+    resigned: {
+      eyeScale: 0.85, eyeSpreadX: 1.0, eyeOffsetY: 2,
+      mouthCurve: -1, mouthWidth: 9,
+      wobbleScale: 0.5, wobbleSpeedScale: 0.6,  // tired
+      bodyPuff: -0.05,
+    },
+    impressed: {
+      eyeScale: 1.25, eyeSpreadX: 1.1, eyeOffsetY: -2,
+      mouthCurve: 4, mouthWidth: 11,
+      wobbleScale: 1.3, wobbleSpeedScale: 1.2,
+      bodyPuff: 0,
+    },
+  };
+
+  // ── FACTORY ──────────────────────────────────────────────────────────────────
+
+  function create(x, y) {
+
+    // Position (canvas px)
+    let _x = x;
+    let _y = y;
+
+    // Time accumulator (seconds) — drives wobble
+    let _t = Math.random() * Math.PI * 2; // random phase start
+
+    // Current and target colour (HSL components)
+    let _col    = { ...PALETTE.smug };   // starts smug — Aristotelian default
+    let _colTgt = { ...PALETTE.smug };
+
+    // Current and target expression key
+    let _expr    = 'smug';
+    let _exprTgt = 'smug';
+
+    // Interpolated expression params (lerped toward target each frame)
+    let _ep = { ...EXPRESSIONS.smug };
+
+    // Squish state
+    // axis: angle in radians of the force causing squish
+    // amount: 0=none, 1=flat. Applied as scaleX = 1+amount, scaleY = 1-amount along axis
+    let _squish      = 0;
+    let _squishAxis  = 0;
+    let _squishTgt   = 0;
+
+    // Bounce — quick vertical bounce on target hit
+    let _bounceY  = 0;
+    let _bounceVy = 0;
+
+    // Particles — emotive effects above blob
+    // Each: { type, x, y, vx, vy, life, maxLife, size, angle, rotSpeed }
+    let _particles = [];
+
+    // Speech bubble state
+    let _bubble = null;
+    // _bubble = { lines[], alpha, phase:'in'|'hold'|'out', elapsed, totalHold }
+
+    // ── PRIVATE HELPERS ────────────────────────────────────────────────────────
+
+    function _lerpHSL(a, b, t) {
+      // Hue interpolation takes shortest path around the circle
+      let dh = b.h - a.h;
+      if (dh > 180)  dh -= 360;
+      if (dh < -180) dh += 360;
+      return {
+        h: a.h + dh * t,
+        s: a.s + (b.s - a.s) * t,
+        l: a.l + (b.l - a.l) * t,
+      };
+    }
+
+    function _lerpNum(a, b, t) { return a + (b - a) * t; }
+
+    function _hsl(col, alpha = 1) {
+      return `hsla(${col.h.toFixed(1)},${col.s.toFixed(1)}%,${col.l.toFixed(1)}%,${alpha})`;
+    }
+
+    // Compute blob outline points for current time + squish
+    function _blobPoints(cx, cy, time, expr) {
+      const pts = [];
+      const amp   = WOBBLE_AMPLITUDE * expr.wobbleScale;
+      const speed = WOBBLE_SPEED * expr.wobbleSpeedScale;
+      const puff  = 1 + expr.bodyPuff;
+
+      for (let i = 0; i < NUM_POINTS; i++) {
+        const angle = (i / NUM_POINTS) * Math.PI * 2;
+        const phase = (i / NUM_POINTS) * Math.PI * 2 * 1.618; // golden ratio phase
+        const r = (BASE_RADIUS * puff) + Math.sin(time * speed + phase) * amp;
+
+        // Apply squish: compress along force axis, expand perpendicular
+        // A force pushing right flattens the blob left-right, bulges it up-down
+        const cosA = Math.cos(_squishAxis);
+        const sinA = Math.sin(_squishAxis);
+        const localX = Math.cos(angle) * r;
+        const localY = Math.sin(angle) * r;
+        // Project onto force axis and perpendicular axis
+        const along = localX * cosA + localY * sinA;
+        const perp  = -localX * sinA + localY * cosA;
+        // Compress along force axis, expand perpendicular (volume-preserving feel)
+        const sAlong = along * (1 - _squish * 0.35);
+        const sPerp  = perp  * (1 + _squish * 0.22);
+        // Back to world space
+        const wx = sAlong * cosA - sPerp * sinA;
+        const wy = sAlong * sinA + sPerp * cosA;
+
+        pts.push({ x: cx + wx, y: cy + wy + _bounceY });
+      }
+      return pts;
+    }
+
+    // Draw closed smooth curve through points using catmull-rom → bezier
+    function _drawBlob(ctx, pts) {
+      const n = pts.length;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const p0 = pts[(i - 1 + n) % n];
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % n];
+        const p3 = pts[(i + 2) % n];
+        // Catmull-Rom control points
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+        if (i === 0) ctx.moveTo(p1.x, p1.y);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+      }
+      ctx.closePath();
+    }
+
+    function _drawEyes(ctx, cx, cy, expr) {
+      const r   = EYE_RADIUS * expr.eyeScale;
+      const ox  = EYE_OFFSET_X * expr.eyeSpreadX;
+      const oy  = EYE_OFFSET_Y + expr.eyeOffsetY + _bounceY;
+      const eyeH = _exprTgt === 'alarmed' ? r * 1.3 : r;
+
+      // ── Eyes ──────────────────────────────────────────────────────────────
+      ctx.fillStyle = '#12101e';
+      ctx.beginPath(); ctx.ellipse(cx - ox, cy + oy, r, eyeH, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx + ox, cy + oy, r, eyeH, 0, 0, Math.PI * 2); ctx.fill();
+
+      // Smug half-lids
+      if (_exprTgt === 'smug') {
+        ctx.fillStyle = _hsl(_col);
+        ctx.fillRect(cx - ox - r - 1, cy + oy - eyeH - 1, r * 2 + 2, eyeH * 0.72);
+        ctx.fillRect(cx + ox - r - 1, cy + oy - eyeH - 1, r * 2 + 2, eyeH * 0.72);
+      }
+
+      // Highlights
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath(); ctx.arc(cx - ox + r * 0.3, cy + oy - eyeH * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + ox + r * 0.3, cy + oy - eyeH * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
+
+      // ── Eyebrows ──────────────────────────────────────────────────────────
+      const browY  = cy + oy - eyeH - 5 + _bounceY;
+      const browW  = r * 1.6;
+      const browH  = 1.8;
+      ctx.lineWidth = browH;
+      ctx.lineCap   = 'round';
+
+      if (_exprTgt === 'offended') {
+        // Inner corners raised — classic anger V shape
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 3);
+        ctx.lineTo(cx - ox + browW * 0.5, browY + 1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox + browW * 0.5, browY - 3);
+        ctx.lineTo(cx + ox - browW * 0.5, browY + 1);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'confused') {
+        // Left brow raised, right brow flat
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 2);
+        ctx.lineTo(cx - ox + browW * 0.5, browY - 5);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY);
+        ctx.lineTo(cx + ox + browW * 0.5, browY);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'alarmed') {
+        // Both brows raised high, arched
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 2);
+        ctx.quadraticCurveTo(cx - ox, browY - 7, cx - ox + browW * 0.5, browY - 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY - 2);
+        ctx.quadraticCurveTo(cx + ox, browY - 7, cx + ox + browW * 0.5, browY - 2);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'resigned') {
+        // Slightly drooping outer corners
+        ctx.strokeStyle = 'rgba(18,16,30,0.6)';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 1);
+        ctx.lineTo(cx - ox + browW * 0.5, browY + 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY + 2);
+        ctx.lineTo(cx + ox + browW * 0.5, browY - 1);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'impressed') {
+        // Raised, slight arch — pleasant surprise
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 3);
+        ctx.quadraticCurveTo(cx - ox, browY - 6, cx - ox + browW * 0.5, browY - 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY - 3);
+        ctx.quadraticCurveTo(cx + ox, browY - 6, cx + ox + browW * 0.5, browY - 3);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'smug') {
+        // One brow slightly arched — the smug look
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY + 1);
+        ctx.quadraticCurveTo(cx - ox, browY - 3, cx - ox + browW * 0.5, browY + 1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY);
+        ctx.lineTo(cx + ox + browW * 0.5, browY);
+        ctx.stroke();
+      }
+    }
+
+    function _drawMouth(ctx, cx, cy, expr) {
+      const mw  = expr.mouthWidth;
+      const mc  = expr.mouthCurve;
+      const my  = cy + 7 + _bounceY;
+
+      ctx.strokeStyle = '#12101e';
+      ctx.lineWidth   = 2;
+      ctx.lineCap     = 'round';
+      ctx.beginPath();
+
+      if (_expr === 'alarmed') {
+        // Small O shape
+        ctx.arc(cx, my, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        return;
+      }
+
+      // Quadratic bezier mouth
+      ctx.moveTo(cx - mw, my);
+      ctx.quadraticCurveTo(cx, my + mc, cx + mw, my);
+      ctx.stroke();
+    }
+
+    // ── PARTICLE SYSTEM ────────────────────────────────────────────────────────
+
+    function _spawnParticles(expr) {
+      // Clear existing particles when expression changes
+      _particles = [];
+
+      const spread = BASE_RADIUS + 6;
+
+      if (expr === 'offended') {
+        // Manga anger marks — 4 jagged spike clusters upper area
+        for (let i = 0; i < 4; i++) {
+          const angle = -Math.PI * 0.9 + (i / 3) * Math.PI * 0.8; // arc above blob
+          _particles.push({
+            type: 'anger',
+            x: _x + Math.cos(angle) * spread * 1.1,
+            y: _y + Math.sin(angle) * spread * 0.7 - 8,
+            vx: Math.cos(angle) * 12,
+            vy: Math.sin(angle) * 10 - 18,
+            life: 0, maxLife: 1.3,
+            size: 7 + Math.random() * 4,
+            angle: Math.random() * Math.PI,
+            rotSpeed: (Math.random() - 0.5) * 2,
+          });
+        }
+      } else if (expr === 'confused') {
+        // Gas plumes — slow rising puffs
+        for (let i = 0; i < 3; i++) {
+          _particles.push({
+            type: 'plume',
+            x: _x + (i - 1) * 14,
+            y: _y - spread + 4,
+            vx: (i - 1) * 6 + (Math.random() - 0.5) * 4,
+            vy: -22 - Math.random() * 10,
+            life: 0, maxLife: 1.6,
+            size: 5 + Math.random() * 4,
+            delay: i * 0.18,
+            angle: 0, rotSpeed: 0,
+          });
+        }
+      } else if (expr === 'alarmed') {
+        // Fast radiating shock lines
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2;
+          _particles.push({
+            type: 'shock',
+            x: _x + Math.cos(angle) * spread * 0.6,
+            y: _y + Math.sin(angle) * spread * 0.6,
+            vx: Math.cos(angle) * 55,
+            vy: Math.sin(angle) * 55,
+            life: 0, maxLife: 0.5,
+            size: 8 + Math.random() * 4,
+            angle, rotSpeed: 0,
+          });
+        }
+      } else if (expr === 'impressed') {
+        // Sparkles pop outward
+        for (let i = 0; i < 5; i++) {
+          const angle = -Math.PI * 0.85 + (i / 4) * Math.PI * 0.7;
+          _particles.push({
+            type: 'sparkle',
+            x: _x + Math.cos(angle) * spread * 0.8,
+            y: _y + Math.sin(angle) * spread * 0.8,
+            vx: Math.cos(angle) * 35,
+            vy: Math.sin(angle) * 35 - 10,
+            life: 0, maxLife: 0.9,
+            size: 4 + Math.random() * 3,
+            angle: Math.random() * Math.PI,
+            rotSpeed: (Math.random() - 0.5) * 6,
+          });
+        }
+      } else if (expr === 'resigned') {
+        // Slow drooping dots — sigh
+        for (let i = 0; i < 3; i++) {
+          _particles.push({
+            type: 'sigh',
+            x: _x + (i - 1) * 10,
+            y: _y - spread + 2,
+            vx: (i - 1) * 3,
+            vy: 8 + Math.random() * 6,   // drifts DOWN — deflated
+            life: 0, maxLife: 1.4,
+            size: 3 + Math.random() * 2,
+            delay: i * 0.22,
+            angle: 0, rotSpeed: 0,
+          });
+        }
+      }
+    }
+
+    function _updateParticles(dt) {
+      _particles = _particles.filter(p => p.life < p.maxLife);
+      for (const p of _particles) {
+        p.life  += dt;
+        p.x     += p.vx * dt;
+        p.y     += p.vy * dt;
+        p.angle += p.rotSpeed * dt;
+        // Decelerate
+        p.vx *= 0.92;
+        p.vy *= 0.92;
+      }
+    }
+
+    function _drawParticles(ctx) {
+      for (const p of _particles) {
+        const delay = p.delay || 0;
+        const elapsed = p.life - delay;
+        if (elapsed < 0) continue;
+        const t = Math.min(elapsed / p.maxLife, 1);
+        // Fade: in quickly, out slowly
+        const alpha = t < 0.2 ? t / 0.2 : 1 - ((t - 0.2) / 0.8);
+        if (alpha <= 0) continue;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+
+        if (p.type === 'anger') {
+          // Manga anger mark — two crossing lines forming ✕ with jagged ends
+          ctx.strokeStyle = '#ff4466';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'square';
+          const s = p.size * (1 - t * 0.3); // shrinks slightly over time
+          // Draw 4-pointed star / cross shape
+          for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * s * 0.3, Math.sin(a) * s * 0.3);
+            ctx.lineTo(Math.cos(a) * s, Math.sin(a) * s);
+            ctx.stroke();
+          }
+          // Small cross lines at tips for jagged look
+          ctx.lineWidth = 1.5;
+          for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI;
+            const tx = Math.cos(a) * s;
+            const ty = Math.sin(a) * s;
+            const perp = a + Math.PI / 2;
+            ctx.beginPath();
+            ctx.moveTo(tx + Math.cos(perp) * 3, ty + Math.sin(perp) * 3);
+            ctx.lineTo(tx - Math.cos(perp) * 3, ty - Math.sin(perp) * 3);
+            ctx.stroke();
+          }
+
+        } else if (p.type === 'plume') {
+          // Gas plume — rounded teardrop puff
+          const r = p.size * (0.5 + t * 0.8); // grows as it rises
+          ctx.fillStyle = 'rgba(180,180,220,0.7)';
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fill();
+          // Highlight
+          ctx.fillStyle = 'rgba(255,255,255,0.35)';
+          ctx.beginPath();
+          ctx.arc(-r * 0.25, -r * 0.25, r * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+
+        } else if (p.type === 'shock') {
+          // Short radiating line
+          const len = p.size * (1 - t * 0.5);
+          ctx.strokeStyle = '#ffdd44';
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(len, 0);
+          ctx.stroke();
+
+        } else if (p.type === 'sparkle') {
+          // 4-point star sparkle
+          const r = p.size * (1 - t * 0.4);
+          ctx.strokeStyle = '#ffe866';
+          ctx.lineWidth = 1.8;
+          ctx.lineCap = 'round';
+          for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            ctx.stroke();
+          }
+          // Centre dot
+          ctx.fillStyle = '#ffe866';
+          ctx.beginPath();
+          ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+
+        } else if (p.type === 'sigh') {
+          // Small drooping dot
+          const r = p.size * (1 - t * 0.3);
+          ctx.fillStyle = 'rgba(150,150,180,0.75)';
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    // ── SPEECH BUBBLE ──────────────────────────────────────────────────────────
+
+    function _wrapText(ctx, text, maxWidth) {
+      const words = text.split(' ');
+      const lines = [];
+      let line = '';
+      ctx.font = BUBBLE_FONT;
+      for (const word of words) {
+        const test = line ? line + ' ' + word : word;
+        if (ctx.measureText(test).width > maxWidth - BUBBLE_PADDING * 2) {
+          if (line) lines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      return lines.slice(0, 3); // max 3 lines
+    }
+
+    function _drawBubble(ctx, cx, cy) {
+      if (!_bubble || _bubble.alpha <= 0.01) return;
+
+      ctx.font = BUBBLE_FONT;
+      const lines = _bubble.lines;
+      const lh    = BUBBLE_LINE_H;
+      const bw    = BUBBLE_MAX_W;
+      const bh    = lines.length * lh + BUBBLE_PADDING * 2;
+      const alpha = _bubble.alpha;
+
+      // Determine bubble position — prefer above-right, avoid edges
+      // cx, cy are blob centre
+      const margin = 12;
+      let bx = cx + BASE_RADIUS + margin;
+      let by = cy - bh / 2;
+
+      // Canvas bounds check — assume ctx.canvas exists
+      const cw = ctx.canvas ? ctx.canvas.width  : 800;
+      const ch = ctx.canvas ? ctx.canvas.height : 600;
+
+      if (bx + bw > cw - 10) bx = cx - BASE_RADIUS - margin - bw;
+      if (by < 10)            by = 10;
+      if (by + bh > ch - 10) by = ch - bh - 10;
+
+      // Pointer tip — midpoint of bubble left/right edge toward blob
+      const pointerSide = bx > cx ? 'left' : 'right';
+      const tipX = pointerSide === 'left' ? bx : bx + bw;
+      const tipY = by + bh / 2;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      // Shadow
+      ctx.shadowColor  = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur   = 12;
+      ctx.shadowOffsetY = 3;
+
+      // Bubble fill
+      ctx.fillStyle = 'rgba(15,16,32,0.92)';
+      _roundRect(ctx, bx, by, bw, bh, 10);
+      ctx.fill();
+
+      // Bubble border — blob colour at 50% opacity
+      ctx.strokeStyle = _hsl(_col, 0.5);
+      ctx.lineWidth   = 1;
+      _roundRect(ctx, bx, by, bw, bh, 10);
+      ctx.stroke();
+
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur  = 0;
+
+      // Pointer triangle
+      ctx.fillStyle = 'rgba(15,16,32,0.92)';
+      ctx.beginPath();
+      if (pointerSide === 'left') {
+        ctx.moveTo(bx, tipY - 6);
+        ctx.lineTo(bx - 8, tipY);
+        ctx.lineTo(bx, tipY + 6);
+      } else {
+        ctx.moveTo(bx + bw, tipY - 6);
+        ctx.lineTo(bx + bw + 8, tipY);
+        ctx.lineTo(bx + bw, tipY + 6);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Text
+      ctx.fillStyle = '#d8daf0';
+      ctx.font      = BUBBLE_FONT;
+      ctx.textBaseline = 'top';
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], bx + BUBBLE_PADDING, by + BUBBLE_PADDING + i * lh);
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    function _roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    // ── PUBLIC METHODS ─────────────────────────────────────────────────────────
+
+    /**
+     * update(dt) — call every frame before draw
+     * dt: elapsed seconds since last frame
+     */
+    function update(dt) {
+      _t += dt;
+
+      // Colour interpolation
+      _col = _lerpHSL(_col, _colTgt, COLOUR_LERP);
+
+      // Expression interpolation (numeric params)
+      const tgt = EXPRESSIONS[_exprTgt];
+      const ELRP = 0.06;
+      for (const k of Object.keys(_ep)) {
+        _ep[k] = _lerpNum(_ep[k], tgt[k], ELRP);
+      }
+      _expr = _exprTgt; // snap label immediately for conditionals
+
+      // Squish decay
+      _squish += (_squishTgt - _squish) * SQUISH_RECOVERY;
+      _squishTgt *= 0.85; // squish target decays naturally
+
+      // Particles
+      _updateParticles(dt);
+
+      // Bounce
+      if (Math.abs(_bounceY) > 0.1 || Math.abs(_bounceVy) > 0.1) {
+        _bounceVy += 180 * dt; // spring back to 0
+        _bounceY  += _bounceVy * dt;
+        if (_bounceY > 0) { _bounceY = 0; _bounceVy = 0; } // floor
+      }
+
+      // Speech bubble timing
+      if (_bubble) {
+        _bubble.elapsed += dt * 1000; // ms
+        const fadeIn  = BUBBLE_FADE_IN;
+        const hold    = _bubble.totalHold;
+        const fadeOut = BUBBLE_FADE_OUT;
+        const total   = fadeIn + hold + fadeOut;
+
+        if (_bubble.elapsed < fadeIn) {
+          _bubble.alpha = _bubble.elapsed / fadeIn;
+        } else if (_bubble.elapsed < fadeIn + hold) {
+          _bubble.alpha = 1;
+        } else if (_bubble.elapsed < total) {
+          _bubble.alpha = 1 - (_bubble.elapsed - fadeIn - hold) / fadeOut;
+        } else {
+          _bubble = null;
+        }
+      }
+    }
+
+    /**
+     * draw(ctx) — render blob + bubble onto ctx
+     */
+    function draw(ctx) {
+      const pts = _blobPoints(_x, _y, _t, _ep);
+
+      // Glow
+      const glow = ctx.createRadialGradient(_x, _y, 0, _x, _y, BASE_RADIUS * 1.8);
+      glow.addColorStop(0,   _hsl(_col, 0.18));
+      glow.addColorStop(1,   _hsl(_col, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(_x, _y, BASE_RADIUS * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body fill gradient — slightly lighter at top
+      const bodyGrad = ctx.createRadialGradient(
+        _x - 6, _y - 8, 2,
+        _x,     _y,     BASE_RADIUS * 1.4
+      );
+      bodyGrad.addColorStop(0, _hsl({ h: _col.h, s: _col.s, l: Math.min(80, _col.l + 14) }));
+      bodyGrad.addColorStop(1, _hsl(_col));
+
+      _drawBlob(ctx, pts);
+      ctx.fillStyle   = bodyGrad;
+      ctx.fill();
+
+      // Body outline
+      _drawBlob(ctx, pts);
+      ctx.strokeStyle = _hsl({ h: _col.h, s: _col.s, l: _col.l - 12 }, 0.6);
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+
+      // Face
+      _drawEyes(ctx, _x, _y, _ep);
+      _drawMouth(ctx, _x, _y, _ep);
+
+      // Particles (drawn above blob body, below speech bubble)
+      _drawParticles(ctx);
+
+      // Speech bubble
+      _drawBubble(ctx, _x, _y);
+    }
+
+    // ── EXTERNAL API ──────────────────────────────────────────────────────────
+
+    /** Move blob to new position instantly */
+    function setPosition(x, y) { _x = x; _y = y; }
+
+    /** Get current position */
+    function getPosition() { return { x: _x, y: _y }; }
+
+    /**
+     * setExpression(name)
+     * Valid: neutral, confused, offended, alarmed, smug, resigned, impressed
+     */
+    function setExpression(name) {
+      if (!EXPRESSIONS[name]) return;
+      if (_exprTgt !== name) _spawnParticles(name); // spawn on change only
+      _exprTgt    = name;
+      _colTgt     = { ...PALETTE[name] };
+    }
+
+    /**
+     * squish(axis, amount, durationMs)
+     * axis: radians — direction of applied force
+     * amount: 0–1 squish intensity
+     */
+    function squish(axis, amount = 0.3, durationMs = 350) {
+      _squishAxis = axis;
+      _squishTgt  = Math.min(1, amount);
+      // Recovery is handled by natural decay — duration hint unused for now
+      // but stored for future spring-damper upgrade
+      void durationMs;
+    }
+
+    /** Bounce upward (on target hit) */
+    function bounce() {
+      _bounceVy = -120;
+    }
+
+    /**
+     * say(text)
+     * Display speech bubble with text. Interrupts any current bubble.
+     */
+    function say(text) {
+      // Need a temporary canvas to measure text — reuse a cached one
+      const tmp = say._tmpCtx || (() => {
+        const c = document.createElement('canvas');
+        say._tmpCtx = c.getContext('2d');
+        return say._tmpCtx;
+      })();
+      tmp.font = BUBBLE_FONT;
+      const lines = _wrapText(tmp, text, BUBBLE_MAX_W);
+      _bubble = {
+        lines,
+        alpha:     0,
+        elapsed:   0,
+        totalHold: BUBBLE_HOLD,
+      };
+    }
+
+    /** True if a bubble is currently showing */
+    function isSpeaking() { return _bubble !== null && _bubble.alpha > 0.01; }
+
+    /** Force-clear any active bubble */
+    function clearBubble() { _bubble = null; }
+
+    /** Current expression key */
+    function expression() { return _exprTgt; }
+
+    return {
+      update,
+      draw,
+      setPosition,
+      getPosition,
+      setExpression,
+      squish,
+      bounce,
+      say,
+      isSpeaking,
+      clearBubble,
+      expression,
+    };
+  }
+
+  return { create };
+
+})();
+
+if (typeof module !== 'undefined') module.exports = Blob;
+</script><script>
+/**
+ * engine.js — PARTICLE game 2D physics engine
+ * No dependencies. Extends patterns from physics.js but fully 2D.
+ *
+ * Usage:
+ *   const eng = Engine.create(levelConfig, envConfig);
+ *   eng.applyForce(fx, fy);   // continuous mode
+ *   eng.applyImpulse(fx, fy); // impulsive mode
+ *   eng.update(dt);
+ *   const s = eng.getState();
+ */
+
+const Engine = (() => {
+
+  // ── CONSTANTS ──────────────────────────────────────────────────────────────
+  const G_PX        = 400;   // 1g in px/s² (tuned for screen scale)
+  const SUBSTEPS    = 2;     // RK4 substeps per frame — safety for fast objects
+  const MAX_SPEED   = 1200;  // px/s — hard clamp prevents tunnelling
+  const BOUNCE_DAMP = 0.45;  // velocity retained on wall bounce (energy loss)
+  const GROUND_DAMP = 0.35;
+
+  // ── ENVIRONMENT CONFIGS ───────────────────────────────────────────────────
+  // Referenced by id from level-data.js
+  const ENVIRONMENTS = {
+    deep_space: {
+      id:          'deep_space',
+      gravity:     0,
+      dragCoeff:   0,
+      frictionCoeff: 0,
+      hasTerrain:  false,
+    },
+    near_planet: {
+      id:          'near_planet',
+      gravity:     0.18,      // fraction of G_PX
+      dragCoeff:   0,
+      frictionCoeff: 0,
+      hasTerrain:  false,
+    },
+    atmosphere: {
+      id:          'atmosphere',
+      gravity:     0.6,
+      dragCoeff:   0.0008,    // quadratic drag coefficient (tuned)
+      frictionCoeff: 0,
+      hasTerrain:  false,
+    },
+    surface: {
+      id:          'surface',
+      gravity:     1.0,
+      dragCoeff:   0.0005,
+      frictionCoeff: 0.25,
+      hasTerrain:  true,
+    },
+  };
+
+  // ── RK4 2D INTEGRATOR ─────────────────────────────────────────────────────
+  // state = { x, y, vx, vy }
+  // accelFn(state) → { ax, ay }
+
+  function _rk4(state, dt, accelFn) {
+    const { x, y, vx, vy } = state;
+
+    const a1 = accelFn({ x, y, vx, vy });
+    const k1 = { dx: vx, dy: vy, dvx: a1.ax, dvy: a1.ay };
+
+    const s2 = { x: x+0.5*dt*k1.dx, y: y+0.5*dt*k1.dy, vx: vx+0.5*dt*k1.dvx, vy: vy+0.5*dt*k1.dvy };
+    const a2 = accelFn(s2);
+    const k2 = { dx: s2.vx, dy: s2.vy, dvx: a2.ax, dvy: a2.ay };
+
+    const s3 = { x: x+0.5*dt*k2.dx, y: y+0.5*dt*k2.dy, vx: vx+0.5*dt*k2.dvx, vy: vy+0.5*dt*k2.dvy };
+    const a3 = accelFn(s3);
+    const k3 = { dx: s3.vx, dy: s3.vy, dvx: a3.ax, dvy: a3.ay };
+
+    const s4 = { x: x+dt*k3.dx, y: y+dt*k3.dy, vx: vx+dt*k3.dvx, vy: vy+dt*k3.dvy };
+    const a4 = accelFn(s4);
+    const k4 = { dx: s4.vx, dy: s4.vy, dvx: a4.ax, dvy: a4.ay };
+
+    return {
+      x:  x  + (dt/6)*(k1.dx  + 2*k2.dx  + 2*k3.dx  + k4.dx),
+      y:  y  + (dt/6)*(k1.dy  + 2*k2.dy  + 2*k3.dy  + k4.dy),
+      vx: vx + (dt/6)*(k1.dvx + 2*k2.dvx + 2*k3.dvx + k4.dvx),
+      vy: vy + (dt/6)*(k1.dvy + 2*k2.dvy + 2*k3.dvy + k4.dvy),
+    };
+  }
+
+  // ── FACTORY ───────────────────────────────────────────────────────────────
+
+  function create(levelCfg, canvasW, canvasH) {
+
+    const env     = ENVIRONMENTS[levelCfg.environment] || ENVIRONMENTS.deep_space;
+    const mass    = levelCfg.blobMass ?? 1.0;   // null treated as 1.0 (massless phase)
+    const maxForce = levelCfg.maxForce ?? 300;
+
+    // Physics state
+    let _state = {
+      x:  levelCfg.blobStartPos.x * canvasW,
+      y:  levelCfg.blobStartPos.y * canvasH,
+      vx: levelCfg.blobStartVel?.x ?? 0,
+      vy: levelCfg.blobStartVel?.y ?? 0,
+    };
+
+    // Applied force this frame (continuous mode)
+    let _force = { x: 0, y: 0 };
+
+    // Pending impulse (impulsive mode) — applied once then cleared
+    let _impulse = { x: 0, y: 0, pending: false };
+
+    // Stats for star criteria
+    let _forceApplications = 0;   // count of discrete force events
+    let _offScreenCount    = 0;   // times blob left canvas
+    let _hitTarget         = false;
+
+    // Stop-target hold state
+    let _stopped       = false;   // blob currently held at a stop target
+    let _stopTimer     = 0;       // seconds held so far
+    const STOP_HOLD    = 2.0;     // seconds to hold before releasing
+
+    // Canvas bounds (updated on resize)
+    let _W = canvasW;
+    let _H = canvasH;
+    const BLOB_R = 28; // matches blob.js BASE_RADIUS
+
+    // ── ACCELERATION FUNCTION ───────────────────────────────────────────────
+
+    function _accel(s) {
+      let ax = _force.x / mass;
+      let ay = _force.y / mass;
+
+      // Gravity
+      ay += env.gravity * G_PX;
+
+      // Quadratic drag (opposes velocity)
+      const speed = Math.hypot(s.vx, s.vy);
+      if (speed > 0.01 && env.dragCoeff > 0) {
+        const dragMag = env.dragCoeff * speed * speed;
+        ax -= dragMag * (s.vx / speed);
+        ay -= dragMag * (s.vy / speed);
+      }
+
+      // Ground friction (only when on ground — detected post-integrate)
+      // Handled in collision resolution, not here
+
+      return { ax, ay };
+    }
+
+    // ── COLLISION RESOLUTION ─────────────────────────────────────────────────
+
+    function _resolveWalls(s) {
+      let { x, y, vx, vy } = s;
+      let hitWall = false;
+
+      if (x - BLOB_R < 0)    { x = BLOB_R;      vx = Math.abs(vx) * BOUNCE_DAMP; hitWall = true; }
+      if (x + BLOB_R > _W)   { x = _W - BLOB_R; vx = -Math.abs(vx) * BOUNCE_DAMP; hitWall = true; }
+      if (y - BLOB_R < 0)    { y = BLOB_R;      vy = Math.abs(vy) * BOUNCE_DAMP; hitWall = true; }
+      if (y + BLOB_R > _H)   { y = _H - BLOB_R; vy = -Math.abs(vy) * BOUNCE_DAMP; hitWall = true; }
+
+      return { x, y, vx, vy, hitWall };
+    }
+
+    // Check if blob has exited canvas bounds (before resolution)
+    function _isOffScreen(s) {
+      return s.x < -BLOB_R*2 || s.x > _W+BLOB_R*2 ||
+             s.y < -BLOB_R*2 || s.y > _H+BLOB_R*2;
+    }
+
+    // Speed clamp
+    function _clampSpeed(s) {
+      const sp = Math.hypot(s.vx, s.vy);
+      if (sp > MAX_SPEED) {
+        const scale = MAX_SPEED / sp;
+        return { ...s, vx: s.vx*scale, vy: s.vy*scale };
+      }
+      return s;
+    }
+
+    // ── TARGET CHECK ─────────────────────────────────────────────────────────
+
+    function _checkTargets(targets) {
+      if (!targets) return { hit: false, idx: -1 };
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        if (t.hit) continue;
+        const dx = _state.x - t.x;
+        const dy = _state.y - t.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < BLOB_R + t.radius) {
+          return { hit: true, idx: i };
+        }
+      }
+      return { hit: false, idx: -1 };
+    }
+
+    // ── PUBLIC ────────────────────────────────────────────────────────────────
+
+    /**
+     * update(dt, targets)
+     * dt: seconds
+     * targets: array of { x, y, radius, hit } — modified in place on hit
+     * Returns: { offScreen, hitTarget, hitIdx, triggerHints }
+     */
+    function update(dt, targets) {
+      const subDt = dt / SUBSTEPS;
+      let offScreen = false;
+      const triggerHints = new Set();
+
+      // Apply pending impulse
+      if (_impulse.pending) {
+        _state.vx += _impulse.x / mass;
+        _state.vy += _impulse.y / mass;
+        _impulse = { x:0, y:0, pending:false };
+        _forceApplications++;
+      }
+
+      // Track force application for continuous mode
+      const forceMag = Math.hypot(_force.x, _force.y);
+      if (forceMag > 0.5) {
+        // Detect trigger hints from force direction vs velocity
+        const velMag = Math.hypot(_state.vx, _state.vy);
+        if (velMag > 20) {
+          const velAngle   = Math.atan2(_state.vy, _state.vx);
+          const forceAngle = Math.atan2(_force.y, _force.x);
+          let diff = forceAngle - velAngle;
+          // Normalise to [-PI, PI]
+          while (diff >  Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          const absDiff = Math.abs(diff);
+
+          if (absDiff > Math.PI * 0.75) triggerHints.add('opposing_force');
+          else if (absDiff > Math.PI * 0.38 && absDiff < Math.PI * 0.62) triggerHints.add('perpendicular');
+        }
+      }
+
+      // RK4 substeps
+      for (let i = 0; i < SUBSTEPS; i++) {
+        if (_isOffScreen(_state)) { offScreen = true; break; }
+        _state = _rk4(_state, subDt, _accel);
+        _state = _clampSpeed(_state);
+      }
+
+      // Off-screen handling
+      if (offScreen) {
+        _offScreenCount++;
+        triggerHints.add('off_screen');
+        // Reset to safe position with dampened velocity
+        _state.x  = Math.max(BLOB_R, Math.min(_W-BLOB_R, _state.x));
+        _state.y  = Math.max(BLOB_R, Math.min(_H-BLOB_R, _state.y));
+        _state.vx *= -BOUNCE_DAMP;
+        _state.vy *= -BOUNCE_DAMP;
+      } else {
+        // Wall resolution (gentle bounce)
+        const resolved = _resolveWalls(_state);
+        if (resolved.hitWall) {
+          _state = { ..._state, ...resolved };
+        }
+      }
+
+      // Coasting detection
+      const vel = Math.hypot(_state.vx, _state.vy);
+      if (vel > 30 && forceMag < 0.5 && !_impulse.pending) {
+        triggerHints.add('coasting');
+      }
+
+      // Friction drag detection (atmosphere/surface — blob slowing without player)
+      if (env.dragCoeff > 0 && vel > 20 && forceMag < 0.5) {
+        triggerHints.add('friction_felt');
+      }
+
+      // Target check
+      const { hit, idx } = _checkTargets(targets);
+      if (hit) {
+        const tgt = targets[idx];
+        tgt.hit    = true;
+        _hitTarget = true;
+        triggerHints.add('correct_hit');
+        _state.x  = tgt.x;
+        _state.y  = tgt.y;
+        _state.vx = 0;
+        _state.vy = 0;
+        _force    = { x: 0, y: 0 };
+        if (tgt.type === 'stop') {
+          _stopped   = true;
+          _stopTimer = 0;
+        }
+      }
+
+      // Stop-target hold — keep blob locked for STOP_HOLD seconds
+      if (_stopped) {
+        _stopTimer += dt;
+        _state.vx = 0;
+        _state.vy = 0;
+        _force    = { x: 0, y: 0 };
+        if (_stopTimer >= STOP_HOLD) _stopped = false;
+      }
+
+      // Clear per-frame continuous force (must be re-applied each frame by input.js)
+      // (do NOT clear here — input.js sets it before update, clears on mouseup)
+
+      return {
+        offScreen,
+        hitTarget:    hit,
+        hitIdx:       idx,
+        triggerHints: [...triggerHints],
+      };
+    }
+
+    /** Set continuous force vector (px/s² before mass division) */
+    function applyForce(fx, fy) {
+      const mag = Math.hypot(fx, fy);
+      if (mag > maxForce) {
+        const s = maxForce / mag;
+        _force = { x: fx*s, y: fy*s };
+      } else {
+        _force = { x: fx, y: fy };
+      }
+      if (mag > 0.5) _forceApplications++;
+    }
+
+    /** Clear continuous force (on mouse up) */
+    function clearForce() {
+      _force = { x: 0, y: 0 };
+    }
+
+    /** Apply a single impulse (px/s, mass-scaled on next update) */
+    function applyImpulse(px, py) {
+      const mag = Math.hypot(px, py);
+      const limit = maxForce * 0.12; // impulse scaled differently
+      if (mag > limit) {
+        const s = limit / mag;
+        _impulse = { x: px*s, y: py*s, pending: true };
+      } else {
+        _impulse = { x: px, y: py, pending: true };
+      }
+    }
+
+    /** Current physics state snapshot */
+    function getState() {
+      return {
+        x:        _state.x,
+        y:        _state.y,
+        vx:       _state.vx,
+        vy:       _state.vy,
+        speed:    Math.hypot(_state.vx, _state.vy),
+        velAngle: Math.atan2(_state.vy, _state.vx),
+        force:    { ..._force },
+        forceMag: Math.hypot(_force.x, _force.y),
+      };
+    }
+
+    /** Update canvas dimensions on resize */
+    function resize(w, h) { _W = w; _H = h; }
+
+    /** Reset blob to level start */
+    function resetLevel() {
+      _state = {
+        x:  levelCfg.blobStartPos.x * _W,
+        y:  levelCfg.blobStartPos.y * _H,
+        vx: levelCfg.blobStartVel?.x ?? 0,
+        vy: levelCfg.blobStartVel?.y ?? 0,
+      };
+      _force              = { x: 0, y: 0 };
+      _impulse            = { x: 0, y: 0, pending: false };
+      _forceApplications  = 0;
+      _offScreenCount     = 0;
+      _hitTarget          = false;
+      _stopped            = false;
+      _stopTimer          = 0;
+    }
+
+    /** Star criteria evaluation */
+    function evaluateStars(maxApplications) {
+      if (!_hitTarget) return 0;
+      let stars = 1;
+      if (_forceApplications <= maxApplications) stars = 2;
+      if (_forceApplications <= maxApplications && _offScreenCount === 0) stars = 3;
+      return stars;
+    }
+
+    /** Current velocity angle in radians (for monologue squish axis) */
+    function velAngle() { return Math.atan2(_state.vy, _state.vx); }
+
+    function isStopped() { return _stopped; }
+    function getStopProgress() { return _stopped ? _stopTimer / STOP_HOLD : 0; }
+
+    return {
+      update,
+      applyForce,
+      clearForce,
+      applyImpulse,
+      getState,
+      resize,
+      resetLevel,
+      evaluateStars,
+      velAngle,
+      isStopped,
+      getStopProgress,
+      ENVIRONMENTS,
+    };
+  }
+
+  return { create, ENVIRONMENTS };
+
+})();
+
+if (typeof module !== 'undefined') module.exports = Engine;
+</script><script>
+/**
+ * input.js — PARTICLE game input handler
+ * Translates click/touch relative to blob → force or impulse vector.
+ * Draws force arrow and dashed aim line on canvas.
+ *
+ * Depends on: engine.js instance
+ *
+ * Usage:
+ *   const inp = Input.create(canvas, engineInstance, levelConfig);
+ *   inp.draw(ctx, blobX, blobY);   // call in render loop
+ *   inp.destroy();                  // remove event listeners on level end
+ */
+
+const Input = (() => {
+
+  // ── VISUAL CONSTANTS ──────────────────────────────────────────────────────
+  const ARROW_COLOR      = '#4df0b0';   // accent green — force arrow
+  const ARROW_ALPHA_MAX  = 0.85;
+  const LINE_DASH        = [6, 5];
+  const LINE_WIDTH       = 1.8;
+  const ARROW_HEAD_LEN   = 12;
+  const ARROW_HEAD_ANGLE = 0.42;        // radians
+
+  // Scale: how many px/s² of force per pixel of click distance
+  // Tuned so a comfortable click distance (~100px) gives a good push
+  const FORCE_SCALE_CONTINUOUS = 3.2;
+  const FORCE_SCALE_IMPULSIVE  = 11.0;
+
+  // Minimum click distance to register (avoids accidental zero-vector)
+  const MIN_DIST = 8;
+
+  // ── FACTORY ───────────────────────────────────────────────────────────────
+
+  function create(canvas, engine, levelCfg) {
+
+    const mode = levelCfg.forceMode || 'continuous'; // 'continuous' | 'impulsive'
+
+    // Pointer state
+    let _active    = false;
+    let _cursorX   = 0;
+    let _cursorY   = 0;
+    let _blobX     = 0;
+    let _blobY     = 0;
+
+    // For impulsive: show flash arrow briefly after click
+    let _flashTimer  = 0;        // seconds remaining
+    let _flashFx     = 0;
+    let _flashFy     = 0;
+    const FLASH_DUR  = 0.45;     // seconds
+
+    // ── COORDINATE HELPER ─────────────────────────────────────────────────
+
+    function _canvasXY(e) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr  = window.devicePixelRatio || 1;
+      // clientX/Y are CSS pixels; canvas logical px = CSS px (we handle DPR via ctx.scale)
+      if (e.touches) {
+        return {
+          x: (e.touches[0].clientX - rect.left),
+          y: (e.touches[0].clientY - rect.top),
+        };
+      }
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+    }
+
+    // ── FORCE COMPUTATION ─────────────────────────────────────────────────
+
+    function _computeForce(cx, cy, bx, by, scale) {
+      const dx  = cx - bx;
+      const dy  = cy - by;
+      const dist = Math.hypot(dx, dy);
+      if (dist < MIN_DIST) return { fx: 0, fy: 0, dist: 0 };
+      return {
+        fx:   (dx / dist) * dist * scale,
+        fy:   (dy / dist) * dist * scale,
+        dist,
+        angle: Math.atan2(dy, dx),
+      };
+    }
+
+    // ── EVENT HANDLERS ────────────────────────────────────────────────────
+
+    function _onDown(e) {
+      e.preventDefault();
+      _active = true;
+      const { x, y } = _canvasXY(e);
+      _cursorX = x;
+      _cursorY = y;
+
+      if (mode === 'impulsive') {
+        // Compute and apply impulse immediately on click
+        const { fx, fy, dist } = _computeForce(x, y, _blobX, _blobY, FORCE_SCALE_IMPULSIVE);
+        if (dist >= MIN_DIST) {
+          engine.applyImpulse(fx, fy);
+          _flashFx    = fx;
+          _flashFy    = fy;
+          _flashTimer = FLASH_DUR;
+        }
+        _active = false; // impulse is one-shot
+      }
+    }
+
+    function _onMove(e) {
+      if (!_active && mode === 'continuous') return;
+      e.preventDefault();
+      const { x, y } = _canvasXY(e);
+      _cursorX = x;
+      _cursorY = y;
+    }
+
+    function _onUp(e) {
+      if (mode === 'continuous') {
+        engine.clearForce();
+      }
+      _active = false;
+    }
+
+    // Mouse
+    canvas.addEventListener('mousedown',  _onDown,  { passive: false });
+    canvas.addEventListener('mousemove',  _onMove,  { passive: false });
+    canvas.addEventListener('mouseup',    _onUp);
+    canvas.addEventListener('mouseleave', _onUp);
+
+    // Touch
+    canvas.addEventListener('touchstart',  _onDown, { passive: false });
+    canvas.addEventListener('touchmove',   _onMove, { passive: false });
+    canvas.addEventListener('touchend',    _onUp,   { passive: false });
+    canvas.addEventListener('touchcancel', _onUp,   { passive: false });
+
+    // ── PUBLIC ────────────────────────────────────────────────────────────
+
+    /**
+     * update(dt, blobX, blobY)
+     * Call every frame. Feeds force into engine for continuous mode.
+     * Updates blob position reference for force calculation.
+     */
+    function update(dt, blobX, blobY) {
+      _blobX = blobX;
+      _blobY = blobY;
+
+      if (mode === 'continuous' && _active) {
+        const { fx, fy } = _computeForce(_cursorX, _cursorY, blobX, blobY, FORCE_SCALE_CONTINUOUS);
+        engine.applyForce(fx, fy);
+      } else if (mode === 'continuous') {
+        engine.clearForce();
+      }
+
+      if (_flashTimer > 0) _flashTimer -= dt;
+    }
+
+    /**
+     * draw(ctx, blobX, blobY)
+     * Renders aim line + force arrow. Call after blob is drawn.
+     */
+    function draw(ctx, blobX, blobY) {
+      // Continuous: draw while active
+      if (mode === 'continuous' && _active) {
+        const dx   = _cursorX - blobX;
+        const dy   = _cursorY - blobY;
+        const dist = Math.hypot(dx, dy);
+        if (dist >= MIN_DIST) {
+          const alpha = Math.min(ARROW_ALPHA_MAX, dist / 120);
+          _drawArrow(ctx, blobX, blobY, _cursorX, _cursorY, alpha);
+        }
+      }
+
+      // Impulsive: show flash arrow briefly after impulse
+      if (mode === 'impulsive' && _flashTimer > 0) {
+        const progress = _flashTimer / FLASH_DUR;
+        const alpha    = progress * ARROW_ALPHA_MAX;
+        const scale    = 0.6 + progress * 0.4; // arrow shrinks as it fades
+        const mag      = Math.hypot(_flashFx, _flashFy);
+        if (mag > 0) {
+          const nx  = _flashFx / mag;
+          const ny  = _flashFy / mag;
+          const len = Math.min(mag * 0.08, 80) * scale;
+          _drawArrow(ctx, blobX, blobY, blobX + nx*len, blobY + ny*len, alpha);
+        }
+      }
+    }
+
+    function _drawArrow(ctx, x1, y1, x2, y2, alpha) {
+      const dx    = x2 - x1;
+      const dy    = y2 - y1;
+      const dist  = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = ARROW_COLOR;
+      ctx.fillStyle   = ARROW_COLOR;
+      ctx.lineWidth   = LINE_WIDTH;
+      ctx.setLineDash(LINE_DASH);
+      ctx.lineCap     = 'round';
+
+      // Dashed line from blob to cursor
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // Arrowhead (solid)
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(
+        x2 - ARROW_HEAD_LEN * Math.cos(angle - ARROW_HEAD_ANGLE),
+        y2 - ARROW_HEAD_LEN * Math.sin(angle - ARROW_HEAD_ANGLE)
+      );
+      ctx.lineTo(
+        x2 - ARROW_HEAD_LEN * Math.cos(angle + ARROW_HEAD_ANGLE),
+        y2 - ARROW_HEAD_LEN * Math.sin(angle + ARROW_HEAD_ANGLE)
+      );
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    /**
+     * drawVelocityArrow(ctx, blobX, blobY, vx, vy)
+     * Renders live velocity vector on blob. Always visible.
+     * Separate from force arrow — different colour and style.
+     */
+    function drawVelocityArrow(ctx, blobX, blobY, vx, vy) {
+      const speed = Math.hypot(vx, vy);
+      if (speed < 8) return; // don't draw for near-zero velocity
+
+      const scale   = Math.min(speed * 0.12, 70); // cap arrow length
+      const angle   = Math.atan2(vy, vx);
+      const tx      = blobX + Math.cos(angle) * scale;
+      const ty      = blobY + Math.sin(angle) * scale;
+      const alpha   = Math.min(0.9, speed / 200);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      ctx.fillStyle   = 'rgba(255,255,255,0.75)';
+      ctx.lineWidth   = 1.5;
+      ctx.setLineDash([]);
+      ctx.lineCap     = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(blobX, blobY);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+
+      // Arrowhead
+      const hl = 9;
+      const ha = 0.42;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx - hl*Math.cos(angle-ha), ty - hl*Math.sin(angle-ha));
+      ctx.lineTo(tx - hl*Math.cos(angle+ha), ty - hl*Math.sin(angle+ha));
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    /** Remove all event listeners — call on level end or game teardown */
+    function destroy() {
+      canvas.removeEventListener('mousedown',  _onDown);
+      canvas.removeEventListener('mousemove',  _onMove);
+      canvas.removeEventListener('mouseup',    _onUp);
+      canvas.removeEventListener('mouseleave', _onUp);
+      canvas.removeEventListener('touchstart',  _onDown);
+      canvas.removeEventListener('touchmove',   _onMove);
+      canvas.removeEventListener('touchend',    _onUp);
+      canvas.removeEventListener('touchcancel', _onUp);
+    }
+
+    /** True if player is currently holding (continuous) or just clicked (impulsive) */
+    function isActive() { return _active || _flashTimer > 0; }
+
+    return {
+      update,
+      draw,
+      drawVelocityArrow,
+      destroy,
+      isActive,
+    };
+  }
+
+  return { create };
+
+})();
+
+if (typeof module !== 'undefined') module.exports = Input;
+</script><script>
+/**
+ * level-data.js — PARTICLE game level configurations
+ * Teacher-editable. Zero logic. Pure data.
+ *
+ * Target positions are in normalised coords (0–1).
+ * Converted to canvas px by the renderer.
+ *
+ * forceMode: 'continuous' | 'impulsive'
+ * blobStartPos: { x, y } normalised
+ * blobStartVel: { x, y } px/s
+ * blobMass: null (massless phase) | number in kg-equivalent units
+ * targets: array of { x, y, radius, type: 'static'|'moving' }
+ * maxForceApplications: star criteria — 3 stars if <= this count AND no off-screen
+ * teachableMoment: vocabulary key fired post-level (null = none)
+ * mcqAfter: mcq id fired after this level (null = none)
+ * tip: one-line hint shown in HUD (null = none)
+ */
+
+const LevelData = (() => {
+
+  const LEVELS = [
+
+    // ── ENVIRONMENT 0: DEEP SPACE ──────────────────────────────────────────
+
+    {
+      id:          1,
+      environment: 'deep_space',
+      title:       'First Contact',
+      forceMode:   'continuous',
+      blobStartPos: { x: 0.15, y: 0.5 },
+      blobStartVel: { x: 0,    y: 0   },
+      blobMass:    null,
+      targets: [
+        { x: 0.82, y: 0.5, radius: 22, type: 'stop' },
+      ],
+      maxForceApplications: 80,   // generous — tutorial level
+      teachableMoment: null,
+      mcqAfter:    null,
+      tip:         'Click near yourself to apply a force.',
+    },
+
+    {
+      id:          2,
+      environment: 'deep_space',
+      title:       'The Brake',
+      forceMode:   'continuous',
+      blobStartPos: { x: 0.15, y: 0.5 },
+      blobStartVel: { x: 220,  y: 0   },  // already moving right — fast
+      blobMass:    null,
+      targets: [
+        { x: 0.72, y: 0.5, radius: 20, type: 'stop' },
+      ],
+      maxForceApplications: 60,
+      teachableMoment: null,
+      mcqAfter:    null,
+      tip:         null,
+    },
+
+    {
+      id:          3,
+      environment: 'deep_space',
+      title:       'Sidestep',
+      forceMode:   'impulsive',
+      blobStartPos: { x: 0.12, y: 0.55 },
+      blobStartVel: { x: 160,  y: 0    },  // moving right
+      blobMass:    null,
+      targets: [
+        { x: 0.80, y: 0.25, radius: 20, type: 'static' },
+      ],
+      maxForceApplications: 4,   // tight — rewards good vector reading
+      teachableMoment: null,
+      mcqAfter:    null,
+      tip:         'Each click applies one push. The object coasts between clicks.',
+    },
+
+    {
+      id:          4,
+      environment: 'deep_space',
+      title:       'The Curve',
+      forceMode:   'impulsive',
+      blobStartPos: { x: 0.12, y: 0.5  },
+      blobStartVel: { x: 140,  y: 0    },
+      blobMass:    null,
+      targets: [
+        { x: 0.5,  y: 0.18, radius: 18, type: 'static' },
+        { x: 0.82, y: 0.5,  radius: 18, type: 'static' },
+        { x: 0.5,  y: 0.82, radius: 18, type: 'static' },
+      ],
+      maxForceApplications: 8,
+      teachableMoment: 'newton_1',   // vocabulary reveal after this level
+      mcqAfter:    'newton_1_checkpoint',
+      tip:         null,
+    },
+
+  ];
+
+  // ── TARGET COLOURS ────────────────────────────────────────────────────────
+  // Visual style for targets — not in level config to keep data clean
+
+  const TARGET_STYLE = {
+    static: {
+      fill:        'rgba(77, 240, 176, 0.12)',
+      stroke:      '#4df0b0',
+      pulseColor:  'rgba(77, 240, 176, 0.25)',
+      hitFill:     'rgba(77, 240, 176, 0.45)',
+    },
+  };
+
+  // ── VOCABULARY STRINGS ────────────────────────────────────────────────────
+  // Displayed post-level. Sourced from monologue-data.js at runtime,
+  // but duplicated here for teacher reference.
+
+  const VOCABULARY = {
+    newton_1: "What you just saw: Newton's First Law.",
+    newton_2: "What you just felt: Newton's Second Law.",
+    vectors:  "Why direction mattered: that's what a vector is.",
+    drag:     "What slowed you without friction: drag.",
+    terminal: "When acceleration stopped: terminal velocity.",
+    friction: "What the surface did to your motion: friction.",
+  };
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+
+  function getLevel(id) {
+    return LEVELS.find(l => l.id === id) || null;
+  }
+
+  function getLevelsByEnvironment(envId) {
+    return LEVELS.filter(l => l.environment === envId);
+  }
+
+  function totalLevels() { return LEVELS.length; }
+
+  return {
+    LEVELS,
+    TARGET_STYLE,
+    VOCABULARY,
+    getLevel,
+    getLevelsByEnvironment,
+    totalLevels,
+  };
+
+})();
+
+if (typeof module !== 'undefined') module.exports = LevelData;
+</script>
+<script>
+const Monologue=(()=>{const PRI={off_screen:100,opposing_force:80,perpendicular:70,mass_introduced:65,friction_felt:60,coasting:40,correct_hit:30},COOLDOWN_S=18,MAX_PER_LEVEL=3,TEX={opposing_force:'offended',coasting:'confused',perpendicular:'confused',off_screen:'alarmed',mass_introduced:'confused',correct_hit:'impressed',friction_felt:'confused'},SQM={opposing_force:{amount:.3,axisFromVel:true},off_screen:{amount:.4,axisFromVel:true},correct_hit:{amount:.25,axisFromVel:false,axis:-Math.PI/2},perpendicular:{amount:.2,axisFromVel:false,axis:0}};const _ps={};function _ep(k){if(!_ps[k]){const s=MonologueData.POOLS[k];if(!s||!Array.isArray(s))return null;_ps[k]={pool:_sh([...s]),pointer:0};}return _ps[k];}function _pl(k){const p=_ep(k);if(!p)return null;if(p.pointer>=p.pool.length){p.pool=_sh([...MonologueData.POOLS[k]]);p.pointer=0;}return p.pool[p.pointer++];}function _sh(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}function create(blob){let _cd=0,_lc=0,_pt=null;const _cs=()=>_cd<=0&&_lc<MAX_PER_LEVEL;function _fire(k,va=0){const l=_pl(k);if(!l)return;blob.setExpression(TEX[k]||'neutral');const sq=SQM[k];if(sq)blob.squish(sq.axisFromVel?va+Math.PI:(sq.axis??0),sq.amount);blob.say(l);_cd=COOLDOWN_S;_lc++;}function update(dt){if(_cd>0)_cd-=dt;if(_pt&&_cs()){_fire(_pt.key,_pt.va);_pt=null;}else if(_pt)_pt=null;}function trigger(k,va=0){if(!_cs())return;const p=PRI[k]??0;if(!_pt||p>_pt.priority)_pt={key:k,priority:p,va};}function triggerTransition(e){const m={planet:'transition_to_planet',atmosphere:'transition_to_atmosphere',surface:'transition_to_surface'};const l=_pl(m[e]);if(!l)return;blob.setExpression('confused');blob.say(l);}function triggerMCQIntro(){const l=_pl('mcq_intro');if(!l)return;blob.setExpression('smug');blob.say(l);}function triggerMCQFeedback(c,cert){const l=MonologueData.POOLS.mcq_feedback[`${c?'correct':'wrong'}_${cert}`];if(!l)return;blob.setExpression(c?'impressed':'resigned');blob.say(l);}function triggerThreeStars(){const l=_pl('three_stars');if(!l)return;blob.setExpression('impressed');blob.say(l);}function resetLevel(){_lc=0;_pt=null;}function reset(){resetLevel();_cd=0;}return{update,trigger,triggerTransition,triggerMCQIntro,triggerMCQFeedback,triggerThreeStars,resetLevel,reset};}return{create};})();
+
+const canvas=document.getElementById('game-canvas'),ctx=canvas.getContext('2d');
+const STARS=Array.from({length:150},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.5+.3,a:Math.random()*.55+.15}));
+let blob,mono,engine,input,targets=[],levelIdx=0,_levelComplete=false,_pulseT=0,_stars=[false,false,false];
+
+function resize(){const dpr=window.devicePixelRatio||1;canvas.width=window.innerWidth*dpr;canvas.height=window.innerHeight*dpr;ctx.setTransform(1,0,0,1,0,0);ctx.scale(dpr,dpr);if(engine)engine.resize(window.innerWidth,window.innerHeight);}
+window.addEventListener('resize',resize);resize();
+
+function initLevel(idx){
+  if(input)input.destroy();
+  levelIdx=idx;const cfg=LevelData.LEVELS[idx];const W=window.innerWidth,H=window.innerHeight;
+  targets=cfg.targets.map(t=>({x:t.x*W,y:t.y*H,radius:t.radius,type:t.type,hit:false}));
+  blob=Blob.create(cfg.blobStartPos.x*W,cfg.blobStartPos.y*H);
+  mono=Monologue.create(blob);engine=Engine.create(cfg,W,H);input=Input.create(canvas,engine,cfg);
+  _levelComplete=false;_pulseT=0;_stars=[false,false,false];
+  document.getElementById('level-title').textContent=`Level ${cfg.id} — ${cfg.title}`;
+  document.getElementById('level-tip').textContent=cfg.tip||'';
+  updateHUD(0);
+  document.getElementById('complete-overlay').classList.remove('visible');
+  document.getElementById('vocab-reveal').classList.remove('visible');
+  blob.setExpression('smug');
+}
+function updateHUD(n){[0,1,2].forEach(i=>document.getElementById('sp'+i).className='star-pip'+(i<n?' lit':''));}
+function showComplete(cfg,stars){
+  [0,1,2].forEach(i=>{const el=document.getElementById('cs'+i);el.className='complete-star';setTimeout(()=>{if(i<stars)el.classList.add('lit');},350+i*300);});
+  document.getElementById('complete-level').textContent=cfg.title;
+  const ve=document.getElementById('complete-vocab');ve.textContent=(cfg.teachableMoment&&LevelData.VOCABULARY[cfg.teachableMoment])?LevelData.VOCABULARY[cfg.teachableMoment]:'';
+  if(stars===3)setTimeout(()=>mono.triggerThreeStars(),800);
+  document.getElementById('complete-overlay').classList.add('visible');
+}
+function drawBg(){const W=window.innerWidth,H=window.innerHeight;const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#050810');g.addColorStop(1,'#07090f');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);for(const s of STARS){ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,210,255,${s.a})`;ctx.fill();}}
+function drawTargets(dt){
+  _pulseT+=dt;
+  for(const t of targets){
+    if(t.hit){
+      ctx.beginPath();ctx.arc(t.x,t.y,t.radius,0,Math.PI*2);ctx.fillStyle='rgba(77,240,176,0.45)';ctx.fill();ctx.strokeStyle='#4df0b0';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.strokeStyle='#4df0b0';ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(t.x-5,t.y);ctx.lineTo(t.x-1,t.y+5);ctx.lineTo(t.x+6,t.y-5);ctx.stroke();
+      // Countdown arc for stop targets
+      if(t.type==='stop'&&engine.isStopped()){
+        const prog=engine.getStopProgress();
+        ctx.strokeStyle='rgba(77,240,176,0.9)';ctx.lineWidth=3;ctx.lineCap='round';
+        ctx.beginPath();ctx.arc(t.x,t.y,t.radius+7,-Math.PI/2,-Math.PI/2+prog*Math.PI*2);ctx.stroke();
+      }
+    } else {
+      const pulse=(Math.sin(_pulseT*1.8)*.5+.5);
+      ctx.beginPath();ctx.arc(t.x,t.y,t.radius+pulse*8,0,Math.PI*2);ctx.strokeStyle='rgba(77,240,176,0.25)';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.beginPath();ctx.arc(t.x,t.y,t.radius,0,Math.PI*2);
+      ctx.fillStyle=t.type==='stop'?'rgba(77,240,176,0.06)':'rgba(77,240,176,0.12)';ctx.fill();
+      ctx.strokeStyle='#4df0b0';ctx.lineWidth=1.5;ctx.stroke();
+      if(t.type==='stop'){
+        // Landing pad crosshair
+        ctx.strokeStyle='rgba(77,240,176,0.4)';ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(t.x-10,t.y);ctx.lineTo(t.x+10,t.y);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(t.x,t.y-10);ctx.lineTo(t.x,t.y+10);ctx.stroke();
+      } else {
+        ctx.beginPath();ctx.arc(t.x,t.y,3,0,Math.PI*2);ctx.fillStyle='#4df0b0';ctx.fill();
+      }
+    }
+  }
+}
+function onLevelComplete(){
+  if(_levelComplete)return;_levelComplete=true;
+  const cfg=LevelData.LEVELS[levelIdx];const stars=engine.evaluateStars(cfg.maxForceApplications);
+  [0,1,2].forEach(i=>setTimeout(()=>{if(i<stars){_stars[i]=true;updateHUD(_stars.filter(Boolean).length);}},400+i*280));
+  blob.bounce();setTimeout(()=>showComplete(cfg,stars),1200);
+}
+document.getElementById('btn-next').addEventListener('click',()=>{const n=levelIdx+1;if(n>=LevelData.LEVELS.length){document.getElementById('complete-overlay').classList.remove('visible');document.getElementById('done-overlay').classList.add('visible');}else initLevel(n);});
+document.getElementById('btn-reset').addEventListener('click',()=>initLevel(levelIdx));
+
+let _last=0;
+function frame(ts){
+  const dt=Math.min((ts-_last)/1000,.05);_last=ts;
+  const state=engine.getState();
+  input.update(dt,state.x,state.y);
+  const result=engine.update(dt,targets);
+  for(const hint of result.triggerHints)mono.trigger(hint,state.velAngle);
+  mono.update(dt);
+  const ns=engine.getState();
+  blob.setPosition(ns.x,ns.y);blob.update(dt);
+  if(result.hitTarget&&!_levelComplete&&targets.every(t=>t.hit))onLevelComplete();
+  const W=window.innerWidth,H=window.innerHeight;
+  ctx.clearRect(0,0,W,H);drawBg();drawTargets(dt);
+  input.drawVelocityArrow(ctx,ns.x,ns.y,ns.vx,ns.vy);
+  input.draw(ctx,ns.x,ns.y);
+  blob.draw(ctx);
+  requestAnimationFrame(frame);
+}
+initLevel(0);
+requestAnimationFrame(ts=>{_last=ts;requestAnimationFrame(frame);});
+</script>
+</body>
+</html>

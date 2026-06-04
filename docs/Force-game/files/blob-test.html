@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARTICLE — Blob Test</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#07090f;--surface:#0d1018;--border:#1e2535;--accent:#4df0b0;--text:#eef2ff;--text-dim:#5a6882}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-shrink:0}
+header h1{font-family:'DM Mono',monospace;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);font-weight:400}
+header span{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--accent)}
+.main{display:flex;flex:1;min-height:0}
+.canvas-wrap{flex:1;min-width:0;position:relative}
+canvas{width:100%;height:100%;display:block}
+.sidebar{width:260px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;padding:16px;gap:16px}
+.section-label{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btn{padding:7px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:'DM Mono',monospace;font-size:.65rem;cursor:pointer;transition:background .12s,border-color .12s;text-align:center}
+.btn:hover{background:rgba(77,240,176,.08);border-color:var(--accent)}
+.btn-wide{grid-column:1/-1}
+.log{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--text-dim);line-height:1.7;flex:1;overflow-y:auto}
+.log-entry{color:var(--accent)}.log-entry.dim{color:var(--text-dim)}
+.info-row{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--text-dim);padding:2px 0}
+.info-row span{color:var(--text)}
+hr{border:none;border-top:1px solid var(--border);margin:0}
+.stars{display:flex;gap:6px;align-items:center}
+.star{width:10px;height:10px;border-radius:50%;border:1px solid var(--text-dim);background:transparent;transition:background .3s}
+.star.filled{background:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>PARTICLE — Blob Test</h1>
+  <span>particles + eyebrows + squish fix</span>
+</header>
+<div class="main">
+  <div class="canvas-wrap"><canvas id="c"></canvas></div>
+  <div class="sidebar">
+    <div>
+      <div class="section-label">Expressions</div>
+      <div class="btn-grid">
+        <button class="btn" onclick="setEx('neutral')">Neutral</button>
+        <button class="btn" onclick="setEx('smug')">Smug</button>
+        <button class="btn" onclick="setEx('confused')">Confused</button>
+        <button class="btn" onclick="setEx('offended')">Offended</button>
+        <button class="btn" onclick="setEx('alarmed')">Alarmed</button>
+        <button class="btn" onclick="setEx('resigned')">Resigned</button>
+        <button class="btn btn-wide" onclick="setEx('impressed')">Impressed</button>
+      </div>
+    </div>
+    <hr>
+    <div>
+      <div class="section-label">Monologue (bypasses cooldown)</div>
+      <div class="btn-grid">
+        <button class="btn" onclick="fire('opposing_force')">Opposing</button>
+        <button class="btn" onclick="fire('coasting')">Coasting</button>
+        <button class="btn" onclick="fire('perpendicular')">Perp</button>
+        <button class="btn" onclick="fire('off_screen')">Off Screen</button>
+        <button class="btn" onclick="fire('mass_introduced')">Mass</button>
+        <button class="btn" onclick="fire('correct_hit')">Hit!</button>
+        <button class="btn" onclick="fire('friction_felt')">Friction</button>
+        <button class="btn btn-wide" onclick="blob.setExpression('smug');blob.say('I have questions. Let\'s see if you\'ve been paying attention.')">MCQ Intro</button>
+        <button class="btn btn-wide" onclick="blob.setExpression('impressed');blob.say('Fine. You understand vectors. Congratulations.');animateStars()">3 Stars</button>
+      </div>
+    </div>
+    <hr>
+    <div>
+      <div class="section-label">Squish (fixed direction)</div>
+      <div class="btn-grid">
+        <button class="btn" onclick="blob.squish(0,.45)">→ Right</button>
+        <button class="btn" onclick="blob.squish(Math.PI,.45)">← Left</button>
+        <button class="btn" onclick="blob.squish(-Math.PI/2,.45)">↑ Up</button>
+        <button class="btn" onclick="blob.squish(Math.PI/2,.45)">↓ Down</button>
+        <button class="btn btn-wide" onclick="blob.bounce()">Bounce</button>
+      </div>
+    </div>
+    <hr>
+    <div>
+      <div class="section-label">Stars</div>
+      <div class="stars">
+        <div class="star" id="s0"></div>
+        <div class="star" id="s1"></div>
+        <div class="star" id="s2"></div>
+      </div>
+    </div>
+    <hr>
+    <div>
+      <div class="section-label">State</div>
+      <div class="info-row">Expression <span id="i-expr">smug</span></div>
+      <div class="info-row">Speaking <span id="i-speak">no</span></div>
+      <div class="info-row">Particles <span id="i-parts">0</span></div>
+      <div class="info-row">FPS <span id="i-fps">—</span></div>
+    </div>
+    <hr>
+    <div class="section-label">Log</div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+<script>
+/**
+ * monologue-data.js — PARTICLE game line pools
+ * Writer-editable. Zero logic. Pure data.
+ *
+ * Each pool: array of strings.
+ * Minimum pool size: 8 lines (prevents early repeats).
+ * monologue.js handles shuffle-without-replacement.
+ */
+
+const MonologueData = (() => {
+
+  const POOLS = {
+
+    // ── TRIGGER: force has antiparallel component to velocity ────────────────
+    opposing_force: [
+      "The force is against me. I was moving forward. This is a personal attack.",
+      "Excuse me. You are pushing me backwards. I had a direction. I had a plan.",
+      "I was going somewhere. I had momentum. What is this.",
+      "This feels deeply personal.",
+      "I am slowing down. WHY am I slowing down.",
+      "The force is... against me? That's not how this works.",
+      "Aristotle did not prepare me for this.",
+      "I object. Formally.",
+      "In 300 BC this would not have happened.",
+      "You are aware that I was moving, yes?",
+      "I had velocity. Good velocity. You have reduced it.",
+      "This is not the direction I agreed to.",
+    ],
+
+    // ── TRIGGER: zero net force, object in motion, >2s duration ─────────────
+    coasting: [
+      "Nobody is pushing me. I should be stopping. I am not stopping.",
+      "I have been moving for an uncomfortable amount of time without assistance.",
+      "Aristotle said I need a force to keep moving. Aristotle was very confident about this.",
+      "...Hello? Is anyone going to push me? No? I'll just... keep going then.",
+      "I don't know how to feel about this.",
+      "The void is not slowing me down. The void should be doing something.",
+      "This is against everything I was told.",
+      "I am becoming suspicious of Aristotle.",
+      "Still going. Still not stopping. This is fine. This is fine.",
+      "I would like to formally request some friction.",
+      "Rest is natural. Someone told me rest is natural. They were wrong.",
+      "I have been coasting for what feels like a philosophical amount of time.",
+    ],
+
+    // ── TRIGGER: force angle 70–110° from velocity direction ─────────────────
+    perpendicular: [
+      "You pushed sideways. I am now going sideways. These facts are related and I don't appreciate it.",
+      "My direction changed but my speed didn't. How. How did you do that.",
+      "This is not the trajectory I planned.",
+      "I was going perfectly straight. Straight is good. Straight made sense.",
+      "You pushed sideways. I curved. I didn't ask to curve.",
+      "The force was perpendicular. My velocity is now... different. I'm processing this.",
+      "Aristotle did not have a word for what just happened. Neither do I.",
+      "I appear to have changed direction without slowing down. This seems wrong.",
+      "Sideways force. Sideways result. The universe is being very literal today.",
+    ],
+
+    // ── TRIGGER: blob heading out of canvas bounds ────────────────────────────
+    off_screen: [
+      "Bold choice.",
+      "I respect the commitment. Not the direction.",
+      "We are going to need to have a conversation about vectors.",
+      "Aristotle would not have done this.",
+      "That was a lot of force for zero results.",
+      "I'm going to be honest. That was not ideal.",
+      "The target was in the other direction. For reference.",
+      "I have left the area. I hope you're pleased.",
+      "Out of bounds. Philosophically and literally.",
+      "I am now somewhere else. This is your fault.",
+    ],
+
+    // ── TRIGGER: first frame of a level with mass assigned ───────────────────
+    mass_introduced: [
+      "I feel... heavier. Something is different. Same push, less enthusiasm.",
+      "You pushed me the same way you pushed that other object. I am not that other object.",
+      "My resistance to motion has increased. I find this undignified.",
+      "Something has changed about my relationship with force. I'm taking notes.",
+      "I have mass now. I've been told this is significant.",
+    ],
+
+    // ── TRIGGER: blob reaches target ─────────────────────────────────────────
+    correct_hit: [
+      "Oh. Oh that was actually correct. Noted.",
+      "Fine. You understand vectors. Congratulations.",
+      "I'll admit that was well-executed.",
+      "...I'm not going to make a big deal of this.",
+      "Noted. You can do this. Noted.",
+      "Acceptable. Reluctantly.",
+      "That was the right direction. And the right magnitude. I'll allow it.",
+    ],
+
+    // ── TRIGGER: decelerating without player input (drag or friction) ─────────
+    friction_felt: [
+      "Something is slowing me down and it isn't you. The ground has opinions about my velocity.",
+      "This surface disagrees with my motion. Philosophically and physically.",
+      "I am experiencing resistance I did not request.",
+      "There is something wrong with the ground. The ground is doing something.",
+      "Aristotle would say this proves rest is natural. Aristotle would be partially right. This is complicated.",
+      "The air itself is pushing back. The air. I didn't think the air cared.",
+      "I am losing speed to nothing visible. This is unsettling.",
+      "Drag. Someone is going to tell me this is called drag.",
+    ],
+
+    // ── ENVIRONMENT TRANSITIONS ───────────────────────────────────────────────
+    // One line fires per transition, chosen randomly from 3 options.
+
+    transition_to_planet: [
+      "Something is pulling me. Very slightly. I'm choosing to ignore it for now.",
+      "The void feels less void-like than it did. Suspicious.",
+      "I detect a gravitational gradient. I have not consented to this.",
+    ],
+
+    transition_to_atmosphere: [
+      "There is resistance. The emptiness has opinions about my velocity.",
+      "I am experiencing drag. This is new. I don't like it.",
+      "Whatever this is, it is slowing me down without my permission.",
+    ],
+
+    transition_to_surface: [
+      "There is ground. Ground has friction. I know about friction now. I wish I didn't.",
+      "Gravity is no longer subtle. Gravity has committed.",
+      "There are structures here. They look confident. Structurally.",
+    ],
+
+    // ── MCQ INTRO ─────────────────────────────────────────────────────────────
+    mcq_intro: [
+      "I have questions. Let's see if you've been paying attention.",
+      "Alright. I have been pushed, curved, and generally disagreed with. Your turn.",
+      "You've been applying forces to me for some time. Let's find out if you learned anything.",
+      "The universe wants to know what you think. So do I. Primarily to disagree.",
+    ],
+
+    // ── MCQ FEEDBACK ─────────────────────────────────────────────────────────
+    // Keyed by result_certainty combinations
+    mcq_feedback: {
+      correct_sure:   "Your instinct is calibrated.",
+      correct_guess:  "Trust it. You're reading the physics right.",
+      correct_unsure: "Fortunate. But the universe was on your side.",
+      wrong_sure:     "Strong instinct. Wrong universe.",
+      wrong_guess:    "Good — you knew something was off.",
+      wrong_unsure:   "At least you were honest about it.",
+    },
+
+    // ── LEVEL COMPLETE — 3 STARS ──────────────────────────────────────────────
+    three_stars: [
+      "I'll admit that was well-executed.",
+      "...I'm not going to make a big deal of this.",
+      "Fine. You understand vectors. Congratulations.",
+      "Noted. You can do this. Noted.",
+      "That was correct. Efficiently correct. I have no notes.",
+    ],
+
+    // ── VOCABULARY REVEAL ─────────────────────────────────────────────────────
+    // Shown post-level as a single line. Not spoken by blob — HUD text only.
+    vocabulary: {
+      newton_1: "What you just saw: Newton's First Law.",
+      newton_2: "What you just felt: Newton's Second Law.",
+      vectors:  "Why direction mattered: that's what a vector is.",
+      drag:     "What slowed you without friction: drag.",
+      terminal: "When acceleration stopped: terminal velocity.",
+      friction: "What the surface did to your motion: friction.",
+    },
+
+  };
+
+  return { POOLS };
+
+})();
+
+if (typeof module !== 'undefined') module.exports = MonologueData;
+</script>
+<script>
+/**
+ * blob.js — PARTICLE game character
+ * The blob. Aristotelian by default. Reluctant traveller.
+ *
+ * No dependencies. Pure canvas 2D.
+ * Usage: const b = Blob.create(x, y); b.update(dt); b.draw(ctx);
+ */
+
+const Blob = (() => {
+
+  // ── CONSTANTS ────────────────────────────────────────────────────────────────
+
+  const BASE_RADIUS      = 28;
+  const WOBBLE_AMPLITUDE = 3;
+  const WOBBLE_SPEED     = 1.8;
+  const NUM_POINTS       = 8;
+  const COLOUR_LERP      = 0.03;
+  const SQUISH_RECOVERY  = 0.08;
+  const EYE_RADIUS       = 3.5;
+  const EYE_OFFSET_X     = 8;
+  const EYE_OFFSET_Y     = -4;
+  const BUBBLE_MAX_W     = 220;
+  const BUBBLE_PADDING   = 12;
+  const BUBBLE_FONT      = '0.72rem DM Mono, monospace';
+  const BUBBLE_LINE_H    = 16;
+  const BUBBLE_FADE_IN   = 300;   // ms
+  const BUBBLE_HOLD      = 3500;  // ms
+  const BUBBLE_FADE_OUT  = 500;   // ms
+
+  // ── PARTICLE CONSTANTS ────────────────────────────────────────────────────────
+  const MAX_PARTICLES    = 24;    // total pool size
+
+  // ── COLOUR PALETTE ───────────────────────────────────────────────────────────
+
+  const PALETTE = {
+    neutral:   { h: 270, s: 40, l: 60 },
+    confused:  { h: 240, s: 40, l: 63 },
+    offended:  { h: 320, s: 42, l: 63 },
+    alarmed:   { h: 280, s: 52, l: 73 },
+    smug:      { h: 260, s: 45, l: 52 },
+    resigned:  { h: 265, s: 15, l: 58 },
+    impressed: { h: 290, s: 42, l: 63 },
+  };
+
+  // ── EXPRESSION DEFINITIONS ───────────────────────────────────────────────────
+  // eyeScale: multiplier on EYE_RADIUS
+  // eyeSpreadX: multiplier on EYE_OFFSET_X
+  // eyeOffsetY: additive px adjustment
+  // mouthCurve: bezier control point vertical offset (+smile, -frown)
+  // mouthWidth: half-width of mouth in px
+  // wobbleScale: multiplier on WOBBLE_AMPLITUDE
+  // wobbleSpeedScale: multiplier on WOBBLE_SPEED
+
+  const EXPRESSIONS = {
+    neutral: {
+      eyeScale: 1.0, eyeSpreadX: 1.0, eyeOffsetY: 0,
+      mouthCurve: 0, mouthWidth: 9,
+      wobbleScale: 1.0, wobbleSpeedScale: 1.0,
+      bodyPuff: 0,
+    },
+    confused: {
+      eyeScale: 1.1, eyeSpreadX: 1.15, eyeOffsetY: -1,
+      mouthCurve: -2, mouthWidth: 8,
+      wobbleScale: 1.1, wobbleSpeedScale: 0.9,
+      bodyPuff: 0,
+    },
+    offended: {
+      eyeScale: 0.75, eyeSpreadX: 0.9, eyeOffsetY: 1,
+      mouthCurve: -4, mouthWidth: 10,
+      wobbleScale: 1.2, wobbleSpeedScale: 1.1,
+      bodyPuff: 0.06,
+    },
+    alarmed: {
+      eyeScale: 1.5, eyeSpreadX: 0.7, eyeOffsetY: -3,
+      mouthCurve: 0, mouthWidth: 5,   // small O
+      wobbleScale: 0.5, wobbleSpeedScale: 2.0,
+      bodyPuff: 0,
+    },
+    smug: {
+      eyeScale: 0.65, eyeSpreadX: 1.0, eyeOffsetY: 1,
+      mouthCurve: 3, mouthWidth: 10,
+      wobbleScale: 0.7, wobbleSpeedScale: 0.7,  // slow, self-satisfied
+      bodyPuff: 0.04,
+    },
+    resigned: {
+      eyeScale: 0.85, eyeSpreadX: 1.0, eyeOffsetY: 2,
+      mouthCurve: -1, mouthWidth: 9,
+      wobbleScale: 0.5, wobbleSpeedScale: 0.6,  // tired
+      bodyPuff: -0.05,
+    },
+    impressed: {
+      eyeScale: 1.25, eyeSpreadX: 1.1, eyeOffsetY: -2,
+      mouthCurve: 4, mouthWidth: 11,
+      wobbleScale: 1.3, wobbleSpeedScale: 1.2,
+      bodyPuff: 0,
+    },
+  };
+
+  // ── FACTORY ──────────────────────────────────────────────────────────────────
+
+  function create(x, y) {
+
+    // Position (canvas px)
+    let _x = x;
+    let _y = y;
+
+    // Time accumulator (seconds) — drives wobble
+    let _t = Math.random() * Math.PI * 2; // random phase start
+
+    // Current and target colour (HSL components)
+    let _col    = { ...PALETTE.smug };   // starts smug — Aristotelian default
+    let _colTgt = { ...PALETTE.smug };
+
+    // Current and target expression key
+    let _expr    = 'smug';
+    let _exprTgt = 'smug';
+
+    // Interpolated expression params (lerped toward target each frame)
+    let _ep = { ...EXPRESSIONS.smug };
+
+    // Squish state
+    // axis: angle in radians of the force causing squish
+    // amount: 0=none, 1=flat. Applied as scaleX = 1+amount, scaleY = 1-amount along axis
+    let _squish      = 0;
+    let _squishAxis  = 0;
+    let _squishTgt   = 0;
+
+    // Bounce — quick vertical bounce on target hit
+    let _bounceY  = 0;
+    let _bounceVy = 0;
+
+    // Particles — emotive effects above blob
+    // Each: { type, x, y, vx, vy, life, maxLife, size, angle, rotSpeed }
+    let _particles = [];
+
+    // Speech bubble state
+    let _bubble = null;
+    // _bubble = { lines[], alpha, phase:'in'|'hold'|'out', elapsed, totalHold }
+
+    // ── PRIVATE HELPERS ────────────────────────────────────────────────────────
+
+    function _lerpHSL(a, b, t) {
+      // Hue interpolation takes shortest path around the circle
+      let dh = b.h - a.h;
+      if (dh > 180)  dh -= 360;
+      if (dh < -180) dh += 360;
+      return {
+        h: a.h + dh * t,
+        s: a.s + (b.s - a.s) * t,
+        l: a.l + (b.l - a.l) * t,
+      };
+    }
+
+    function _lerpNum(a, b, t) { return a + (b - a) * t; }
+
+    function _hsl(col, alpha = 1) {
+      return `hsla(${col.h.toFixed(1)},${col.s.toFixed(1)}%,${col.l.toFixed(1)}%,${alpha})`;
+    }
+
+    // Compute blob outline points for current time + squish
+    function _blobPoints(cx, cy, time, expr) {
+      const pts = [];
+      const amp   = WOBBLE_AMPLITUDE * expr.wobbleScale;
+      const speed = WOBBLE_SPEED * expr.wobbleSpeedScale;
+      const puff  = 1 + expr.bodyPuff;
+
+      for (let i = 0; i < NUM_POINTS; i++) {
+        const angle = (i / NUM_POINTS) * Math.PI * 2;
+        const phase = (i / NUM_POINTS) * Math.PI * 2 * 1.618; // golden ratio phase
+        const r = (BASE_RADIUS * puff) + Math.sin(time * speed + phase) * amp;
+
+        // Apply squish: compress along force axis, expand perpendicular
+        // A force pushing right flattens the blob left-right, bulges it up-down
+        const cosA = Math.cos(_squishAxis);
+        const sinA = Math.sin(_squishAxis);
+        const localX = Math.cos(angle) * r;
+        const localY = Math.sin(angle) * r;
+        // Project onto force axis and perpendicular axis
+        const along = localX * cosA + localY * sinA;
+        const perp  = -localX * sinA + localY * cosA;
+        // Compress along force axis, expand perpendicular (volume-preserving feel)
+        const sAlong = along * (1 - _squish * 0.35);
+        const sPerp  = perp  * (1 + _squish * 0.22);
+        // Back to world space
+        const wx = sAlong * cosA - sPerp * sinA;
+        const wy = sAlong * sinA + sPerp * cosA;
+
+        pts.push({ x: cx + wx, y: cy + wy + _bounceY });
+      }
+      return pts;
+    }
+
+    // Draw closed smooth curve through points using catmull-rom → bezier
+    function _drawBlob(ctx, pts) {
+      const n = pts.length;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const p0 = pts[(i - 1 + n) % n];
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % n];
+        const p3 = pts[(i + 2) % n];
+        // Catmull-Rom control points
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+        if (i === 0) ctx.moveTo(p1.x, p1.y);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+      }
+      ctx.closePath();
+    }
+
+    function _drawEyes(ctx, cx, cy, expr) {
+      const r   = EYE_RADIUS * expr.eyeScale;
+      const ox  = EYE_OFFSET_X * expr.eyeSpreadX;
+      const oy  = EYE_OFFSET_Y + expr.eyeOffsetY + _bounceY;
+      const eyeH = _exprTgt === 'alarmed' ? r * 1.3 : r;
+
+      // ── Eyes ──────────────────────────────────────────────────────────────
+      ctx.fillStyle = '#12101e';
+      ctx.beginPath(); ctx.ellipse(cx - ox, cy + oy, r, eyeH, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx + ox, cy + oy, r, eyeH, 0, 0, Math.PI * 2); ctx.fill();
+
+      // Smug half-lids
+      if (_exprTgt === 'smug') {
+        ctx.fillStyle = _hsl(_col);
+        ctx.fillRect(cx - ox - r - 1, cy + oy - eyeH - 1, r * 2 + 2, eyeH * 0.72);
+        ctx.fillRect(cx + ox - r - 1, cy + oy - eyeH - 1, r * 2 + 2, eyeH * 0.72);
+      }
+
+      // Highlights
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath(); ctx.arc(cx - ox + r * 0.3, cy + oy - eyeH * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + ox + r * 0.3, cy + oy - eyeH * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
+
+      // ── Eyebrows ──────────────────────────────────────────────────────────
+      const browY  = cy + oy - eyeH - 5 + _bounceY;
+      const browW  = r * 1.6;
+      const browH  = 1.8;
+      ctx.lineWidth = browH;
+      ctx.lineCap   = 'round';
+
+      if (_exprTgt === 'offended') {
+        // Inner corners raised — classic anger V shape
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 3);
+        ctx.lineTo(cx - ox + browW * 0.5, browY + 1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox + browW * 0.5, browY - 3);
+        ctx.lineTo(cx + ox - browW * 0.5, browY + 1);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'confused') {
+        // Left brow raised, right brow flat
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 2);
+        ctx.lineTo(cx - ox + browW * 0.5, browY - 5);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY);
+        ctx.lineTo(cx + ox + browW * 0.5, browY);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'alarmed') {
+        // Both brows raised high, arched
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 2);
+        ctx.quadraticCurveTo(cx - ox, browY - 7, cx - ox + browW * 0.5, browY - 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY - 2);
+        ctx.quadraticCurveTo(cx + ox, browY - 7, cx + ox + browW * 0.5, browY - 2);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'resigned') {
+        // Slightly drooping outer corners
+        ctx.strokeStyle = 'rgba(18,16,30,0.6)';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 1);
+        ctx.lineTo(cx - ox + browW * 0.5, browY + 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY + 2);
+        ctx.lineTo(cx + ox + browW * 0.5, browY - 1);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'impressed') {
+        // Raised, slight arch — pleasant surprise
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY - 3);
+        ctx.quadraticCurveTo(cx - ox, browY - 6, cx - ox + browW * 0.5, browY - 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY - 3);
+        ctx.quadraticCurveTo(cx + ox, browY - 6, cx + ox + browW * 0.5, browY - 3);
+        ctx.stroke();
+
+      } else if (_exprTgt === 'smug') {
+        // One brow slightly arched — the smug look
+        ctx.strokeStyle = '#12101e';
+        ctx.beginPath();
+        ctx.moveTo(cx - ox - browW * 0.5, browY + 1);
+        ctx.quadraticCurveTo(cx - ox, browY - 3, cx - ox + browW * 0.5, browY + 1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + ox - browW * 0.5, browY);
+        ctx.lineTo(cx + ox + browW * 0.5, browY);
+        ctx.stroke();
+      }
+    }
+
+    function _drawMouth(ctx, cx, cy, expr) {
+      const mw  = expr.mouthWidth;
+      const mc  = expr.mouthCurve;
+      const my  = cy + 7 + _bounceY;
+
+      ctx.strokeStyle = '#12101e';
+      ctx.lineWidth   = 2;
+      ctx.lineCap     = 'round';
+      ctx.beginPath();
+
+      if (_expr === 'alarmed') {
+        // Small O shape
+        ctx.arc(cx, my, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        return;
+      }
+
+      // Quadratic bezier mouth
+      ctx.moveTo(cx - mw, my);
+      ctx.quadraticCurveTo(cx, my + mc, cx + mw, my);
+      ctx.stroke();
+    }
+
+    // ── PARTICLE SYSTEM ────────────────────────────────────────────────────────
+
+    function _spawnParticles(expr) {
+      // Clear existing particles when expression changes
+      _particles = [];
+
+      const spread = BASE_RADIUS + 6;
+
+      if (expr === 'offended') {
+        // Manga anger marks — 4 jagged spike clusters upper area
+        for (let i = 0; i < 4; i++) {
+          const angle = -Math.PI * 0.9 + (i / 3) * Math.PI * 0.8; // arc above blob
+          _particles.push({
+            type: 'anger',
+            x: _x + Math.cos(angle) * spread * 1.1,
+            y: _y + Math.sin(angle) * spread * 0.7 - 8,
+            vx: Math.cos(angle) * 12,
+            vy: Math.sin(angle) * 10 - 18,
+            life: 0, maxLife: 1.3,
+            size: 7 + Math.random() * 4,
+            angle: Math.random() * Math.PI,
+            rotSpeed: (Math.random() - 0.5) * 2,
+          });
+        }
+      } else if (expr === 'confused') {
+        // Gas plumes — slow rising puffs
+        for (let i = 0; i < 3; i++) {
+          _particles.push({
+            type: 'plume',
+            x: _x + (i - 1) * 14,
+            y: _y - spread + 4,
+            vx: (i - 1) * 6 + (Math.random() - 0.5) * 4,
+            vy: -22 - Math.random() * 10,
+            life: 0, maxLife: 1.6,
+            size: 5 + Math.random() * 4,
+            delay: i * 0.18,
+            angle: 0, rotSpeed: 0,
+          });
+        }
+      } else if (expr === 'alarmed') {
+        // Fast radiating shock lines
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2;
+          _particles.push({
+            type: 'shock',
+            x: _x + Math.cos(angle) * spread * 0.6,
+            y: _y + Math.sin(angle) * spread * 0.6,
+            vx: Math.cos(angle) * 55,
+            vy: Math.sin(angle) * 55,
+            life: 0, maxLife: 0.5,
+            size: 8 + Math.random() * 4,
+            angle, rotSpeed: 0,
+          });
+        }
+      } else if (expr === 'impressed') {
+        // Sparkles pop outward
+        for (let i = 0; i < 5; i++) {
+          const angle = -Math.PI * 0.85 + (i / 4) * Math.PI * 0.7;
+          _particles.push({
+            type: 'sparkle',
+            x: _x + Math.cos(angle) * spread * 0.8,
+            y: _y + Math.sin(angle) * spread * 0.8,
+            vx: Math.cos(angle) * 35,
+            vy: Math.sin(angle) * 35 - 10,
+            life: 0, maxLife: 0.9,
+            size: 4 + Math.random() * 3,
+            angle: Math.random() * Math.PI,
+            rotSpeed: (Math.random() - 0.5) * 6,
+          });
+        }
+      } else if (expr === 'resigned') {
+        // Slow drooping dots — sigh
+        for (let i = 0; i < 3; i++) {
+          _particles.push({
+            type: 'sigh',
+            x: _x + (i - 1) * 10,
+            y: _y - spread + 2,
+            vx: (i - 1) * 3,
+            vy: 8 + Math.random() * 6,   // drifts DOWN — deflated
+            life: 0, maxLife: 1.4,
+            size: 3 + Math.random() * 2,
+            delay: i * 0.22,
+            angle: 0, rotSpeed: 0,
+          });
+        }
+      }
+    }
+
+    function _updateParticles(dt) {
+      _particles = _particles.filter(p => p.life < p.maxLife);
+      for (const p of _particles) {
+        p.life  += dt;
+        p.x     += p.vx * dt;
+        p.y     += p.vy * dt;
+        p.angle += p.rotSpeed * dt;
+        // Decelerate
+        p.vx *= 0.92;
+        p.vy *= 0.92;
+      }
+    }
+
+    function _drawParticles(ctx) {
+      for (const p of _particles) {
+        const delay = p.delay || 0;
+        const elapsed = p.life - delay;
+        if (elapsed < 0) continue;
+        const t = Math.min(elapsed / p.maxLife, 1);
+        // Fade: in quickly, out slowly
+        const alpha = t < 0.2 ? t / 0.2 : 1 - ((t - 0.2) / 0.8);
+        if (alpha <= 0) continue;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+
+        if (p.type === 'anger') {
+          // Manga anger mark — two crossing lines forming ✕ with jagged ends
+          ctx.strokeStyle = '#ff4466';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'square';
+          const s = p.size * (1 - t * 0.3); // shrinks slightly over time
+          // Draw 4-pointed star / cross shape
+          for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * s * 0.3, Math.sin(a) * s * 0.3);
+            ctx.lineTo(Math.cos(a) * s, Math.sin(a) * s);
+            ctx.stroke();
+          }
+          // Small cross lines at tips for jagged look
+          ctx.lineWidth = 1.5;
+          for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI;
+            const tx = Math.cos(a) * s;
+            const ty = Math.sin(a) * s;
+            const perp = a + Math.PI / 2;
+            ctx.beginPath();
+            ctx.moveTo(tx + Math.cos(perp) * 3, ty + Math.sin(perp) * 3);
+            ctx.lineTo(tx - Math.cos(perp) * 3, ty - Math.sin(perp) * 3);
+            ctx.stroke();
+          }
+
+        } else if (p.type === 'plume') {
+          // Gas plume — rounded teardrop puff
+          const r = p.size * (0.5 + t * 0.8); // grows as it rises
+          ctx.fillStyle = 'rgba(180,180,220,0.7)';
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fill();
+          // Highlight
+          ctx.fillStyle = 'rgba(255,255,255,0.35)';
+          ctx.beginPath();
+          ctx.arc(-r * 0.25, -r * 0.25, r * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+
+        } else if (p.type === 'shock') {
+          // Short radiating line
+          const len = p.size * (1 - t * 0.5);
+          ctx.strokeStyle = '#ffdd44';
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(len, 0);
+          ctx.stroke();
+
+        } else if (p.type === 'sparkle') {
+          // 4-point star sparkle
+          const r = p.size * (1 - t * 0.4);
+          ctx.strokeStyle = '#ffe866';
+          ctx.lineWidth = 1.8;
+          ctx.lineCap = 'round';
+          for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            ctx.stroke();
+          }
+          // Centre dot
+          ctx.fillStyle = '#ffe866';
+          ctx.beginPath();
+          ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+
+        } else if (p.type === 'sigh') {
+          // Small drooping dot
+          const r = p.size * (1 - t * 0.3);
+          ctx.fillStyle = 'rgba(150,150,180,0.75)';
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    // ── SPEECH BUBBLE ──────────────────────────────────────────────────────────
+
+    function _wrapText(ctx, text, maxWidth) {
+      const words = text.split(' ');
+      const lines = [];
+      let line = '';
+      ctx.font = BUBBLE_FONT;
+      for (const word of words) {
+        const test = line ? line + ' ' + word : word;
+        if (ctx.measureText(test).width > maxWidth - BUBBLE_PADDING * 2) {
+          if (line) lines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+      return lines.slice(0, 3); // max 3 lines
+    }
+
+    function _drawBubble(ctx, cx, cy) {
+      if (!_bubble || _bubble.alpha <= 0.01) return;
+
+      ctx.font = BUBBLE_FONT;
+      const lines = _bubble.lines;
+      const lh    = BUBBLE_LINE_H;
+      const bw    = BUBBLE_MAX_W;
+      const bh    = lines.length * lh + BUBBLE_PADDING * 2;
+      const alpha = _bubble.alpha;
+
+      // Determine bubble position — prefer above-right, avoid edges
+      // cx, cy are blob centre
+      const margin = 12;
+      let bx = cx + BASE_RADIUS + margin;
+      let by = cy - bh / 2;
+
+      // Canvas bounds check — assume ctx.canvas exists
+      const cw = ctx.canvas ? ctx.canvas.width  : 800;
+      const ch = ctx.canvas ? ctx.canvas.height : 600;
+
+      if (bx + bw > cw - 10) bx = cx - BASE_RADIUS - margin - bw;
+      if (by < 10)            by = 10;
+      if (by + bh > ch - 10) by = ch - bh - 10;
+
+      // Pointer tip — midpoint of bubble left/right edge toward blob
+      const pointerSide = bx > cx ? 'left' : 'right';
+      const tipX = pointerSide === 'left' ? bx : bx + bw;
+      const tipY = by + bh / 2;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      // Shadow
+      ctx.shadowColor  = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur   = 12;
+      ctx.shadowOffsetY = 3;
+
+      // Bubble fill
+      ctx.fillStyle = 'rgba(15,16,32,0.92)';
+      _roundRect(ctx, bx, by, bw, bh, 10);
+      ctx.fill();
+
+      // Bubble border — blob colour at 50% opacity
+      ctx.strokeStyle = _hsl(_col, 0.5);
+      ctx.lineWidth   = 1;
+      _roundRect(ctx, bx, by, bw, bh, 10);
+      ctx.stroke();
+
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur  = 0;
+
+      // Pointer triangle
+      ctx.fillStyle = 'rgba(15,16,32,0.92)';
+      ctx.beginPath();
+      if (pointerSide === 'left') {
+        ctx.moveTo(bx, tipY - 6);
+        ctx.lineTo(bx - 8, tipY);
+        ctx.lineTo(bx, tipY + 6);
+      } else {
+        ctx.moveTo(bx + bw, tipY - 6);
+        ctx.lineTo(bx + bw + 8, tipY);
+        ctx.lineTo(bx + bw, tipY + 6);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Text
+      ctx.fillStyle = '#d8daf0';
+      ctx.font      = BUBBLE_FONT;
+      ctx.textBaseline = 'top';
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], bx + BUBBLE_PADDING, by + BUBBLE_PADDING + i * lh);
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    function _roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    // ── PUBLIC METHODS ─────────────────────────────────────────────────────────
+
+    /**
+     * update(dt) — call every frame before draw
+     * dt: elapsed seconds since last frame
+     */
+    function update(dt) {
+      _t += dt;
+
+      // Colour interpolation
+      _col = _lerpHSL(_col, _colTgt, COLOUR_LERP);
+
+      // Expression interpolation (numeric params)
+      const tgt = EXPRESSIONS[_exprTgt];
+      const ELRP = 0.06;
+      for (const k of Object.keys(_ep)) {
+        _ep[k] = _lerpNum(_ep[k], tgt[k], ELRP);
+      }
+      _expr = _exprTgt; // snap label immediately for conditionals
+
+      // Squish decay
+      _squish += (_squishTgt - _squish) * SQUISH_RECOVERY;
+      _squishTgt *= 0.85; // squish target decays naturally
+
+      // Particles
+      _updateParticles(dt);
+
+      // Bounce
+      if (Math.abs(_bounceY) > 0.1 || Math.abs(_bounceVy) > 0.1) {
+        _bounceVy += 180 * dt; // spring back to 0
+        _bounceY  += _bounceVy * dt;
+        if (_bounceY > 0) { _bounceY = 0; _bounceVy = 0; } // floor
+      }
+
+      // Speech bubble timing
+      if (_bubble) {
+        _bubble.elapsed += dt * 1000; // ms
+        const fadeIn  = BUBBLE_FADE_IN;
+        const hold    = _bubble.totalHold;
+        const fadeOut = BUBBLE_FADE_OUT;
+        const total   = fadeIn + hold + fadeOut;
+
+        if (_bubble.elapsed < fadeIn) {
+          _bubble.alpha = _bubble.elapsed / fadeIn;
+        } else if (_bubble.elapsed < fadeIn + hold) {
+          _bubble.alpha = 1;
+        } else if (_bubble.elapsed < total) {
+          _bubble.alpha = 1 - (_bubble.elapsed - fadeIn - hold) / fadeOut;
+        } else {
+          _bubble = null;
+        }
+      }
+    }
+
+    /**
+     * draw(ctx) — render blob + bubble onto ctx
+     */
+    function draw(ctx) {
+      const pts = _blobPoints(_x, _y, _t, _ep);
+
+      // Glow
+      const glow = ctx.createRadialGradient(_x, _y, 0, _x, _y, BASE_RADIUS * 1.8);
+      glow.addColorStop(0,   _hsl(_col, 0.18));
+      glow.addColorStop(1,   _hsl(_col, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(_x, _y, BASE_RADIUS * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body fill gradient — slightly lighter at top
+      const bodyGrad = ctx.createRadialGradient(
+        _x - 6, _y - 8, 2,
+        _x,     _y,     BASE_RADIUS * 1.4
+      );
+      bodyGrad.addColorStop(0, _hsl({ h: _col.h, s: _col.s, l: Math.min(80, _col.l + 14) }));
+      bodyGrad.addColorStop(1, _hsl(_col));
+
+      _drawBlob(ctx, pts);
+      ctx.fillStyle   = bodyGrad;
+      ctx.fill();
+
+      // Body outline
+      _drawBlob(ctx, pts);
+      ctx.strokeStyle = _hsl({ h: _col.h, s: _col.s, l: _col.l - 12 }, 0.6);
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+
+      // Face
+      _drawEyes(ctx, _x, _y, _ep);
+      _drawMouth(ctx, _x, _y, _ep);
+
+      // Particles (drawn above blob body, below speech bubble)
+      _drawParticles(ctx);
+
+      // Speech bubble
+      _drawBubble(ctx, _x, _y);
+    }
+
+    // ── EXTERNAL API ──────────────────────────────────────────────────────────
+
+    /** Move blob to new position instantly */
+    function setPosition(x, y) { _x = x; _y = y; }
+
+    /** Get current position */
+    function getPosition() { return { x: _x, y: _y }; }
+
+    /**
+     * setExpression(name)
+     * Valid: neutral, confused, offended, alarmed, smug, resigned, impressed
+     */
+    function setExpression(name) {
+      if (!EXPRESSIONS[name]) return;
+      if (_exprTgt !== name) _spawnParticles(name); // spawn on change only
+      _exprTgt    = name;
+      _colTgt     = { ...PALETTE[name] };
+    }
+
+    /**
+     * squish(axis, amount, durationMs)
+     * axis: radians — direction of applied force
+     * amount: 0–1 squish intensity
+     */
+    function squish(axis, amount = 0.3, durationMs = 350) {
+      _squishAxis = axis;
+      _squishTgt  = Math.min(1, amount);
+      // Recovery is handled by natural decay — duration hint unused for now
+      // but stored for future spring-damper upgrade
+      void durationMs;
+    }
+
+    /** Bounce upward (on target hit) */
+    function bounce() {
+      _bounceVy = -120;
+    }
+
+    /**
+     * say(text)
+     * Display speech bubble with text. Interrupts any current bubble.
+     */
+    function say(text) {
+      // Need a temporary canvas to measure text — reuse a cached one
+      const tmp = say._tmpCtx || (() => {
+        const c = document.createElement('canvas');
+        say._tmpCtx = c.getContext('2d');
+        return say._tmpCtx;
+      })();
+      tmp.font = BUBBLE_FONT;
+      const lines = _wrapText(tmp, text, BUBBLE_MAX_W);
+      _bubble = {
+        lines,
+        alpha:     0,
+        elapsed:   0,
+        totalHold: BUBBLE_HOLD,
+      };
+    }
+
+    /** True if a bubble is currently showing */
+    function isSpeaking() { return _bubble !== null && _bubble.alpha > 0.01; }
+
+    /** Force-clear any active bubble */
+    function clearBubble() { _bubble = null; }
+
+    /** Current expression key */
+    function expression() { return _exprTgt; }
+
+    return {
+      update,
+      draw,
+      setPosition,
+      getPosition,
+      setExpression,
+      squish,
+      bounce,
+      say,
+      isSpeaking,
+      clearBubble,
+      expression,
+    };
+  }
+
+  return { create };
+
+})();
+
+if (typeof module !== 'undefined') module.exports = Blob;
+</script>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+function resize(){const dpr=window.devicePixelRatio||1,w=canvas.parentElement;canvas.width=w.clientWidth*dpr;canvas.height=w.clientHeight*dpr;ctx.setTransform(1,0,0,1,0,0);ctx.scale(dpr,dpr);if(blob)blob.setPosition(w.clientWidth/2,w.clientHeight/2);}
+window.addEventListener('resize',()=>{ctx.setTransform(1,0,0,1,0,0);resize();});
+const blob=Blob.create(400,300);
+resize();
+const STARS_BG=Array.from({length:120},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.4+.3,a:Math.random()*.6+.2}));
+const logEl=document.getElementById('log');
+function log(msg,dim=false){const d=document.createElement('div');d.className='log-entry'+(dim?' dim':'');d.textContent=msg;logEl.prepend(d);while(logEl.children.length>40)logEl.lastChild.remove();}
+const EXPR_MAP={opposing_force:'offended',coasting:'confused',perpendicular:'confused',off_screen:'alarmed',mass_introduced:'confused',correct_hit:'impressed',friction_felt:'confused'};
+function setEx(name){blob.setExpression(name);log('expr → '+name);}
+function fire(key){
+  const pools=MonologueData.POOLS[key];
+  if(!pools||!Array.isArray(pools))return;
+  const line=pools[Math.floor(Math.random()*pools.length)];
+  blob.setExpression(EXPR_MAP[key]||'neutral');
+  blob.say(line);
+  log('"'+line.slice(0,50)+(line.length>50?'...':'"'));
+}
+let _stars=[false,false,false];
+function animateStars(){_stars=[false,false,false];updateSD();[300,600,900].forEach((d,i)=>setTimeout(()=>{_stars[i]=true;updateSD();},d));}
+function updateSD(){[0,1,2].forEach(i=>{document.getElementById('s'+i).className='star'+(_stars[i]?' filled':'');});}
+let _last=0,_fc=0,_ft=0,_fps=0;
+function drawBg(){const w=canvas.width/(window.devicePixelRatio||1),h=canvas.height/(window.devicePixelRatio||1);const g=ctx.createLinearGradient(0,0,0,h);g.addColorStop(0,'#050810');g.addColorStop(1,'#07090f');ctx.fillStyle=g;ctx.fillRect(0,0,w,h);for(const s of STARS_BG){ctx.beginPath();ctx.arc(s.x*w,s.y*h,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,210,255,${s.a})`;ctx.fill();}}
+function frame(ts){
+  const dt=Math.min((ts-_last)/1000,.05);_last=ts;
+  _fc++;_ft+=dt;if(_ft>=.5){_fps=Math.round(_fc/_ft);_fc=0;_ft=0;}
+  const w=canvas.width/(window.devicePixelRatio||1),h=canvas.height/(window.devicePixelRatio||1);
+  blob.update(dt);
+  ctx.clearRect(0,0,w,h);drawBg();blob.draw(ctx);
+  document.getElementById('i-expr').textContent=blob.expression();
+  document.getElementById('i-speak').textContent=blob.isSpeaking()?'yes':'no';
+  document.getElementById('i-fps').textContent=_fps;
+  // Count particles via a hack — expose via expression check
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(ts=>{_last=ts;requestAnimationFrame(frame);});
+log('Blob ready. Try Offended for anger marks, Confused for gas plumes.',true);
+</script>
+</body>
+</html>

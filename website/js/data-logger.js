@@ -183,11 +183,27 @@ const DataLogger = (() => {
       r.correct === null ? 'n/a' : r.correct,
       r.timestamp,
     ]);
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    downloadRowsCSV(`galileo_${_session.sessionKey}_${_session.studentAlias}.csv`, headers, rows);
+  }
+
+  function _escapeCsv(value) {
+    if (value === null || value === undefined) return '';
+    const text = String(value);
+    return text.includes(',') || text.includes('"') || text.includes('\n')
+      ? `"${text.replace(/"/g, '""')}"`
+      : text;
+  }
+
+  function downloadRowsCSV(filename, headers, rows) {
+    if (!rows || !rows.length) {
+      alert('No data yet.');
+      return;
+    }
+    const csvRows = [headers.join(','), ...rows.map(row => row.map(_escapeCsv).join(','))];
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
     const a    = document.createElement('a');
     a.href     = URL.createObjectURL(blob);
-    a.download = `galileo_${_session.sessionKey}_${_session.studentAlias}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -383,6 +399,7 @@ const DataLogger = (() => {
     getScore,
     restoreFromStorage,
     downloadCSV,
+    downloadRowsCSV,
     setSheetsUrl,
     getSheetsUrl,
     submitToSheets,

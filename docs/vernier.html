@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vernier Caliper Lab — InquisitivePhysics</title>
+<meta name="description" content="Explore vernier calipers with realistic external, internal and depth measurements. Take multiple readings and save CSV data for analysis.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #07090f;
+  --surface: #0d1018;
+  --surface2: #111520;
+  --border: #1e2535;
+  --border2: #263045;
+  --accent: #4df0b0;
+  --accent2: #38d49a;
+  --gold: #ffd166;
+  --purple: #c77dff;
+  --red: #ff6b6b;
+  --text: #eef2ff;
+  --text-mid: #a8b4d0;
+  --text-dim: #5a6882;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+}
+header {
+  padding: 18px 24px;
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.logo { font-size: 1.05rem; letter-spacing: -0.02em; font-weight: 700; color: var(--accent); }
+.logo em { color: var(--text); font-style: normal; }
+.page-title { color: var(--text-mid); font-size: 0.86rem; }
+.page-tag { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 0.74rem; color: var(--accent); border: 1px solid var(--accent); padding: 5px 12px; border-radius: 999px; }
+.main { display: grid; grid-template-columns: 1.4fr 0.86fr; gap: 18px; padding: 18px; }
+canvas { width: 100%; display: block; border-radius: 18px; background: radial-gradient(circle at 20% 20%, rgba(77,240,176,0.14), transparent 25%), linear-gradient(180deg, rgba(255,255,255,0.03), transparent 45%), #09111f; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03); }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; }
+.panel-section { padding: 18px; border-bottom: 1px solid var(--border); }
+.panel-section:last-child { border-bottom: none; }
+.section-title { font-size: 0.92rem; margin-bottom: 12px; font-weight: 700; }
+.section-copy { color: var(--text-mid); font-size: 0.82rem; line-height: 1.7; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; padding: 18px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+.btn { appearance: none; border: 1.5px solid var(--border2); background: var(--surface); color: var(--text); font-size: 0.82rem; font-weight: 600; padding: 10px 14px; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.active { background: var(--accent); color: #04110a; border-color: var(--accent); }
+.btn.go { background: var(--accent); color: #04110a; border-color: var(--accent); }
+.btn.danger { border-color: var(--red); }
+.btn.danger:hover { color: var(--red); }
+.status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: rgba(77,240,176,0.08); color: var(--accent); border: 1px solid rgba(77,240,176,0.18); font-family: 'DM Mono', monospace; font-size: 0.78rem; }
+.controls-grid { display: grid; gap: 10px; }
+.order-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.order-row label { font-size: 0.82rem; color: var(--text-mid); }
+.order-row input, .order-row select { flex: 1; min-width: 120px; padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--border2); background: var(--bg); color: var(--text); }
+.slider-block { display: grid; gap: 8px; margin-top: 12px; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row span { font-family: 'DM Mono', monospace; font-size: 0.88rem; color: var(--accent); width: 68px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-family: 'DM Mono', monospace; }
+th, td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.82rem; }
+th { color: var(--text-mid); text-align: left; background: rgba(255,255,255,0.02); }
+td { color: var(--text); }
+.empty-state { padding: 18px; text-align: center; color: var(--text-mid); }
+.note { margin-top: 12px; font-size: 0.8rem; color: var(--text-mid); }
+.badge { display: inline-flex; padding: 5px 10px; border-radius: 999px; background: rgba(255,209,102,0.12); color: var(--gold); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em; }
+@media (max-width: 1120px) { .main { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .toolbar { justify-content: center; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Inquisitive<em>Physics</em></div>
+  <div class="page-title">Vernier Caliper Lab · Measurement</div>
+  <div class="page-tag">NEW</div>
+</header>
+<div class="toolbar">
+  <button class="btn go" onclick="newObject()">New object</button>
+  <button class="btn" onclick="resetCaliper()">Reset caliper</button>
+  <button class="btn" id="btnExternal" onclick="setMode('external')">External</button>
+  <button class="btn" id="btnInternal" onclick="setMode('internal')">Internal</button>
+  <button class="btn" id="btnDepth" onclick="setMode('depth')">Depth</button>
+  <button class="btn" id="btnRotate" onclick="toggleRotate()">Rotate</button>
+  <button class="btn" id="btnFlip" onclick="toggleFlip()">Flip</button>
+  <button class="btn purple-style" onclick="captureMeasurement()">⊕ Capture</button>
+  <button class="btn gold-style" onclick="downloadCSV()">↓ CSV</button>
+</div>
+<div class="main">
+  <div>
+    <div class="panel">
+      <div class="panel-section">
+        <div class="section-title">Measurement scene</div>
+        <div class="section-copy">Use the vernier caliper to measure the object correctly. Pick the right mode, move the jaws, and take at least three readings for averaging.</div>
+      </div>
+      <div class="panel-section" style="padding:0;">
+        <div class="canvas-frame"><canvas id="vernierCanvas"></canvas></div>
+      </div>
+      <div class="panel-section">
+        <div class="section-title">Reading</div>
+        <div class="slider-block">
+          <div class="slider-row"><span>Scale</span><input type="range" id="readingSlider" min="0" max="150" step="0.05" value="80" oninput="updateSlider(this.value)"></div>
+          <div class="slider-row"><span>Value</span><span id="readingValue">80.00 mm</span></div>
+        </div>
+        <div class="note">Drag the slider to close the jaws or extend the depth probe until the caliper matches the object.</div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <div class="panel-section">
+        <div class="section-title">Task details</div>
+        <div class="status-pill" id="modeStatus">Mode: External</div>
+        <p class="section-copy" id="taskHint">Measure the outside width of the object. This measurement uses the external jaws.</p>
+      </div>
+      <div class="panel-section">
+        <div class="section-title">Measurements</div>
+        <div class="table-wrap">
+          <table><thead><tr><th>#</th><th>Mode</th><th>Value</th></tr></thead><tbody id="measurementsBody"></tbody></table>
+          <div class="empty-state" id="measurementsEmpty">No readings recorded yet.</div>
+        </div>
+        <div class="note">Record at least three readings for each mode before averaging. The table keeps every capture.</div>
+      </div>
+      <div class="panel-section">
+        <div class="section-title">Averages</div>
+        <div class="section-copy" id="averageText">No averages yet.</div>
+      </div>
+      <div class="panel-section">
+        <div class="section-title">Teacher controls</div>
+        <div class="controls-grid">
+          <label><input type="checkbox" id="fixedObjectToggle" onchange="toggleFixedObject(this.checked)"> Fixed object mode</label>
+          <label>
+            Choose object
+            <select id="presetSelect" onchange="changePreset(this.value)" disabled>
+              <option value="block_hole">Block with hole</option>
+              <option value="ring">Hollow ring</option>
+              <option value="block_depth">Block with depth slot</option>
+            </select>
+          </label>
+        </div>
+        <div class="note">Teachers can choose a fixed object type for all students, or leave the scene random.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="js/draw-vernier.js"></script>
+<script src="js/data-logger.js"></script>
+<script>
+const PRESETS = {
+  block_hole: {
+    label: 'Block with hole', outer: 88, inner: 36, depth: 18, hasInternal: true, hasDepth: true,
+  },
+  ring: {
+    label: 'Hollow ring', outer: 92, inner: 42, depth: 0, hasInternal: true, hasDepth: false,
+  },
+  block_depth: {
+    label: 'Depth block', outer: 100, inner: 0, depth: 24, hasInternal: false, hasDepth: true,
+  },
+};
+
+let vernier = null;
+let measurements = [];
+let fixedObjectMode = false;
+let currentPreset = 'block_hole';
+let currentObject = null;
+let flipH = false;
+let flipV = false;
+
+function init() {
+  const canvas = document.getElementById('vernierCanvas');
+  vernier = DrawVernier.create(canvas);
+  setMode('external');
+  newObject();
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+}
+
+function resizeCanvas() {
+  const canvas = document.getElementById('vernierCanvas');
+  const parent = canvas.parentElement;
+  canvas.width = parent.offsetWidth;
+  canvas.height = parent.offsetHeight;
+  canvas.style.width = parent.offsetWidth + 'px';
+  canvas.style.height = parent.offsetHeight + 'px';
+  vernier.draw();
+}
+
+function randomObject() {
+  const choices = [
+    { label: 'Block with hole', outer: rand(78, 104), inner: rand(28, 44), depth: rand(14, 24), hasInternal: true, hasDepth: true },
+    { label: 'Hollow ring', outer: rand(80, 110), inner: rand(30, 50), depth: 0, hasInternal: true, hasDepth: false },
+    { label: 'Depth block', outer: rand(86, 112), inner: 0, depth: rand(16, 30), hasInternal: false, hasDepth: true },
+  ];
+  return choices[Math.floor(Math.random() * choices.length)];
+}
+
+function rand(min, max) {
+  return Math.round((Math.random() * (max - min) + min) * 10) / 10;
+}
+
+function newObject() {
+  currentObject = fixedObjectMode ? { ...PRESETS[currentPreset] } : randomObject();
+  vernier.setObject(currentObject);
+  measurements = [];
+  document.getElementById('readingSlider').value = vernier.getReading();
+  document.getElementById('readingValue').textContent = `${vernier.getReading().toFixed(2)} mm`;
+  renderMeasurements();
+}
+
+function setMode(mode) {
+  vernier.setMode(mode);
+  document.getElementById('btnExternal').classList.toggle('active', mode === 'external');
+  document.getElementById('btnInternal').classList.toggle('active', mode === 'internal');
+  document.getElementById('btnDepth').classList.toggle('active', mode === 'depth');
+  const text = mode === 'external'
+    ? 'Measure the object width with the outside jaws.'
+    : mode === 'internal'
+    ? 'Open the internal jaws and measure the hole diameter.'
+    : 'Extend the depth probe into the pocket to measure the depth.';
+  document.getElementById('taskHint').textContent = text;
+  document.getElementById('modeStatus').textContent = `Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+  document.getElementById('readingSlider').min = mode === 'depth' ? 0 : 10;
+  document.getElementById('readingSlider').max = mode === 'depth' ? 40 : 150;
+  document.getElementById('readingSlider').step = 0.05;
+  document.getElementById('readingSlider').value = vernier.getReading();
+  document.getElementById('readingValue').textContent = `${vernier.getReading().toFixed(2)} mm`;
+  renderMeasurements();
+}
+
+function updateSlider(value) {
+  vernier.setPosition(parseFloat(value));
+  document.getElementById('readingValue').textContent = `${parseFloat(value).toFixed(2)} mm`;
+}
+
+function captureMeasurement() {
+  const state = vernier.getState();
+  if (state.mode === 'internal' && !currentObject.hasInternal) {
+    alert('That object does not have an internal feature to measure.');
+    return;
+  }
+  if (state.mode === 'depth' && !currentObject.hasDepth) {
+    alert('That object does not have a depth feature to measure.');
+    return;
+  }
+  measurements.push({
+    n: measurements.length + 1,
+    mode: state.mode,
+    value: state.position,
+  });
+  renderMeasurements();
+}
+
+function renderMeasurements() {
+  const body = document.getElementById('measurementsBody');
+  const empty = document.getElementById('measurementsEmpty');
+  body.innerHTML = '';
+  if (!measurements.length) {
+    empty.style.display = 'block';
+    document.getElementById('averageText').textContent = 'No averages yet.';
+    return;
+  }
+  empty.style.display = 'none';
+  measurements.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.n}</td><td>${row.mode}</td><td>${row.value.toFixed(2)} mm</td>`;
+    body.appendChild(tr);
+  });
+  const groups = groupByMode();
+  const averages = Object.keys(groups).map(mode => {
+    const values = groups[mode];
+    const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return `${mode}: ${avg.toFixed(2)} mm (${values.length} readings)`;
+  });
+  document.getElementById('averageText').textContent = averages.join(' · ');
+}
+
+function groupByMode() {
+  return measurements.reduce((acc, row) => {
+    if (!acc[row.mode]) acc[row.mode] = [];
+    acc[row.mode].push(row.value);
+    return acc;
+  }, {});
+}
+
+function toggleRotate() {
+  flipH = !flipH;
+  vernier.setFlip(flipH, flipV);
+}
+
+function toggleFlip() {
+  flipV = !flipV;
+  vernier.setFlip(flipH, flipV);
+}
+
+function resetCaliper() {
+  vernier.reset();
+  document.getElementById('readingSlider').value = vernier.getReading();
+  document.getElementById('readingValue').textContent = `${vernier.getReading().toFixed(2)} mm`;
+}
+
+function toggleFixedObject(enabled) {
+  fixedObjectMode = enabled;
+  document.getElementById('presetSelect').disabled = !enabled;
+  if (enabled) {
+    currentPreset = document.getElementById('presetSelect').value;
+  }
+  newObject();
+}
+
+function changePreset(value) {
+  currentPreset = value;
+  if (fixedObjectMode) newObject();
+}
+
+function downloadCSV() {
+  if (!measurements.length) { alert('No measurements recorded yet.'); return; }
+  const headers = ['Run', 'Mode', 'Value (mm)'];
+  const rows = measurements.map(r => [r.n, r.mode, r.value.toFixed(2)]);
+  DataLogger.downloadRowsCSV('vernier_measurements.csv', headers, rows);
+}
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>

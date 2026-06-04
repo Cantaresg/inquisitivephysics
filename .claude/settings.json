@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"d:\\\\physics_math_sims\\\\Chem_sim\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Read(//d/physics_math_sim/Chem_sim/electrochem_lab/controller/**)",
+      "Bash(Get-ChildItem -Path \"d:\\\\physics_math_sims\\\\Chem_sim\" -Recurse -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -First 50)"
+    ]
+  }
+}
